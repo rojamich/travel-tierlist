@@ -4,6 +4,12 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Travel Tier List</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;700&family=Manrope:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
@@ -103,29 +109,65 @@
       </section>
 
       <section class="tier-list" aria-label="Tier list">
-        <div class="tier-column">
-          <h2>S Tier</h2>
-          <div class="tier-items" data-tier="S"></div>
+        <div class="tier-row" data-tier="S">
+          <div class="tier-label">
+            <span>S</span>
+            <small>Legendary</small>
+          </div>
+          <div class="tier-content">
+            <h2>Instant return trips</h2>
+            <div class="tier-items" data-tier="S"></div>
+          </div>
         </div>
-        <div class="tier-column">
-          <h2>A Tier</h2>
-          <div class="tier-items" data-tier="A"></div>
+        <div class="tier-row" data-tier="A">
+          <div class="tier-label">
+            <span>A</span>
+            <small>Essential</small>
+          </div>
+          <div class="tier-content">
+            <h2>High priority</h2>
+            <div class="tier-items" data-tier="A"></div>
+          </div>
         </div>
-        <div class="tier-column">
-          <h2>B Tier</h2>
-          <div class="tier-items" data-tier="B"></div>
+        <div class="tier-row" data-tier="B">
+          <div class="tier-label">
+            <span>B</span>
+            <small>Strong</small>
+          </div>
+          <div class="tier-content">
+            <h2>Would love to go</h2>
+            <div class="tier-items" data-tier="B"></div>
+          </div>
         </div>
-        <div class="tier-column">
-          <h2>C Tier</h2>
-          <div class="tier-items" data-tier="C"></div>
+        <div class="tier-row" data-tier="C">
+          <div class="tier-label">
+            <span>C</span>
+            <small>Maybe</small>
+          </div>
+          <div class="tier-content">
+            <h2>Needs more research</h2>
+            <div class="tier-items" data-tier="C"></div>
+          </div>
         </div>
-        <div class="tier-column">
-          <h2>D Tier</h2>
-          <div class="tier-items" data-tier="D"></div>
+        <div class="tier-row" data-tier="D">
+          <div class="tier-label">
+            <span>D</span>
+            <small>Low</small>
+          </div>
+          <div class="tier-content">
+            <h2>Only if the moment fits</h2>
+            <div class="tier-items" data-tier="D"></div>
+          </div>
         </div>
-        <div class="tier-column unranked">
-          <h2>Unranked</h2>
-          <div class="tier-items" data-tier="unranked"></div>
+        <div class="tier-row unranked" data-tier="unranked">
+          <div class="tier-label">
+            <span>?</span>
+            <small>Unranked</small>
+          </div>
+          <div class="tier-content">
+            <h2>Not scored yet</h2>
+            <div class="tier-items" data-tier="unranked"></div>
+          </div>
         </div>
       </section>
 
@@ -142,13 +184,16 @@
       <form method="dialog" class="dialog-form" id="country-form">
         <header>
           <h2 id="dialog-title">Rank Country</h2>
-          <button type="button" class="ghost" id="close-dialog" aria-label="Close dialog">✕</button>
+          <button type="button" class="ghost" id="close-dialog" aria-label="Close dialog">x</button>
         </header>
 
         <div class="form-grid">
           <div>
             <label for="country-name">Country</label>
-            <input id="country-name" name="name" list="country-options" required />
+            <div class="field-row">
+              <select id="country-name" name="name" required></select>
+              <button type="button" class="ghost" id="random-country">Random</button>
+            </div>
             <p class="helper" id="country-availability">0 countries remaining</p>
           </div>
           <div>
@@ -160,7 +205,7 @@
             </select>
           </div>
           <div>
-            <label for="country-tier">Tier</label>
+            <label for="country-tier">Tier (average)</label>
             <select id="country-tier" name="tier" required>
               <option value="S">S</option>
               <option value="A">A</option>
@@ -172,7 +217,18 @@
           </div>
           <div>
             <label for="country-best-time">Best time to travel</label>
-            <input id="country-best-time" name="bestTime" placeholder="e.g. Apr–Jun" />
+            <input id="country-best-time" name="bestTime" placeholder="e.g. Apr-Jun" />
+          </div>
+          <div class="full-width profile-switch">
+            <span>Profile</span>
+            <label>
+              <input type="radio" name="profile" value="mike" checked />
+              Mike
+            </label>
+            <label>
+              <input type="radio" name="profile" value="jen" />
+              Jen
+            </label>
           </div>
           <div>
             <label for="country-days">Time needed</label>
@@ -183,8 +239,111 @@
             <input id="country-budget" name="budget" placeholder="e.g. $2,000" />
           </div>
           <div class="full-width">
-            <label for="country-notes">Ranking notes / quiz result</label>
+            <label for="country-notes">Profile notes (Mike/Jen)</label>
             <textarea id="country-notes" name="notes" rows="3"></textarea>
+          </div>
+          <div class="full-width score-section">
+            <div class="score-header">
+              <div>
+                <h3>Score quiz</h3>
+                <p>Answer the five prompts to generate a total score and suggested tier.</p>
+              </div>
+              <label class="auto-tier">
+                <input type="checkbox" id="score-auto-tier" checked />
+                Auto-tier from score
+              </label>
+            </div>
+            <div class="score-grid">
+              <div>
+                <label for="score-wonder">Wonder</label>
+                <select id="score-wonder" name="wonder">
+                  <option value="">Not scored</option>
+                  <option value="5">5 - Multiple wonders</option>
+                  <option value="4">4 - At least one wonder</option>
+                  <option value="3">3 - Multiple big attractions</option>
+                  <option value="2">2 - One main attraction</option>
+                  <option value="1">1 - No attractions</option>
+                </select>
+              </div>
+              <div>
+                <label for="score-things">Things to do</label>
+                <select id="score-things" name="things">
+                  <option value="">Not scored</option>
+                  <option value="5">5 - Multiple adventure types</option>
+                  <option value="4">4 - At least one adventure</option>
+                  <option value="3">3 - Multiple sights</option>
+                  <option value="2">2 - One main sightseeing focus</option>
+                  <option value="1">1 - No sights</option>
+                </select>
+              </div>
+              <div>
+                <label for="score-food">Food</label>
+                <select id="score-food" name="food">
+                  <option value="">Not scored</option>
+                  <option value="5">5 - Delicious + variety</option>
+                  <option value="4">4 - Delicious or variety</option>
+                  <option value="3">3 - Good or some variety</option>
+                  <option value="2">2 - Enough to eat</option>
+                  <option value="1">1 - Bring your own</option>
+                </select>
+              </div>
+              <div>
+                <label for="score-transportation">Transportation</label>
+                <select id="score-transportation" name="transportation">
+                  <option value="">Not scored</option>
+                  <option value="5">5 - Easy, clean, varied</option>
+                  <option value="4">4 - Multiple modes</option>
+                  <option value="3">3 - Basic transportation</option>
+                  <option value="2">2 - Challenging transportation</option>
+                  <option value="1">1 - No transportation</option>
+                </select>
+              </div>
+              <div>
+                <label for="score-safety">Safety</label>
+                <select id="score-safety" name="safety">
+                  <option value="">Not scored</option>
+                  <option value="5">5 - Zero concerns</option>
+                  <option value="4">4 - Standard precautions</option>
+                  <option value="3">3 - Some areas off limits</option>
+                  <option value="2">2 - Major precautions needed</option>
+                  <option value="1">1 - Why are we going?</option>
+                </select>
+              </div>
+            </div>
+            <div class="score-summary">
+              <div>
+                <span class="summary-label">Average score</span>
+                <strong id="score-total">Not scored</strong>
+              </div>
+              <div>
+                <span class="summary-label">Suggested tier</span>
+                <strong id="score-tier">-</strong>
+              </div>
+            </div>
+            <button type="button" class="primary reveal-score-btn" id="reveal-score">
+              Reveal score
+            </button>
+          </div>
+          <div class="full-width">
+            <label for="country-pre-notes">Before-you-go notes (profile)</label>
+            <textarea id="country-pre-notes" name="preNotes" rows="2"></textarea>
+          </div>
+          <div class="full-width">
+            <label for="country-post-notes">After-the-trip notes (profile)</label>
+            <textarea id="country-post-notes" name="postNotes" rows="2"></textarea>
+          </div>
+          <div class="full-width">
+            <label for="country-attractions">Top attractions (optional)</label>
+            <textarea id="country-attractions" name="attractions" rows="2"></textarea>
+          </div>
+          <div class="full-width">
+            <label for="country-images">Image URLs (optional)</label>
+            <textarea
+              id="country-images"
+              name="images"
+              rows="2"
+              placeholder="Paste a few image URLs, separated by commas"
+            ></textarea>
           </div>
         </div>
 
@@ -217,12 +376,58 @@
             <dt>Budget</dt>
             <dd class="budget"></dd>
           </div>
+          <div>
+            <dt>Score</dt>
+            <dd class="score-total"></dd>
+          </div>
+          <div>
+            <dt>Score breakdown</dt>
+            <dd class="score-breakdown"></dd>
+          </div>
         </dl>
         <p class="notes"></p>
+        <div class="note-grid">
+          <div>
+            <h4>Before you go</h4>
+            <p class="pre-notes"></p>
+          </div>
+          <div>
+            <h4>After the trip</h4>
+            <p class="post-notes"></p>
+          </div>
+        </div>
       </article>
     </template>
 
-    <datalist id="country-options"></datalist>
+    <dialog id="score-reveal-dialog">
+      <div class="reveal-dialog">
+        <header>
+          <div>
+            <h2 id="reveal-title">Score reveal</h2>
+            <p id="reveal-subtitle">Your scoring breakdown and highlights.</p>
+          </div>
+          <button type="button" class="ghost" id="close-reveal" aria-label="Close reveal">
+            x
+          </button>
+        </header>
+        <div class="reveal-body">
+          <div class="reveal-score">
+            <h3>Score</h3>
+            <p id="reveal-score-value"></p>
+            <p id="reveal-breakdown"></p>
+          </div>
+          <div class="reveal-images">
+            <h3>Photo highlights</h3>
+            <div class="reveal-gallery" id="reveal-gallery"></div>
+            <p class="helper" id="reveal-gallery-note"></p>
+          </div>
+          <div class="reveal-attractions">
+            <h3>Top attractions</h3>
+            <ul id="reveal-attractions"></ul>
+          </div>
+        </div>
+      </div>
+    </dialog>
 
     <script src="countries.js"></script>
     <script src="script.js"></script>
