@@ -1593,9 +1593,10 @@ function syncCountryProfiles(country, profileKeys) {
   const payload = {};
   keys.forEach((key) => {
     const profile = country.profiles?.[key] ?? createEmptyProfile();
+    const scoreTotal = getProfileScoreTotal(profile);
     payload[`profiles.${key}`] = {
       scores: profile.scores,
-      scoreTotal: profile.scoreTotal,
+      scoreTotal: Number.isFinite(scoreTotal) ? scoreTotal : null,
       notes: profile.notes,
       preNotes: profile.preNotes,
       postNotes: profile.postNotes,
@@ -1618,7 +1619,7 @@ function shouldSyncProfile(profile) {
   if (!profile) {
     return false;
   }
-  const hasScores = Number.isFinite(profile.scoreTotal);
+  const hasScores = Number.isFinite(getProfileScoreTotal(profile));
   const hasNotes = Boolean(profile.notes || profile.preNotes || profile.postNotes);
   return hasScores || hasNotes;
 }
@@ -1707,8 +1708,8 @@ function mergeRemoteCountries(remoteCountries, localCountries) {
       const remoteProfile = remote.profiles?.[key] ?? createEmptyProfile();
       const localStamp = getTimestampValue(localProfile.updatedAt);
       const remoteStamp = getTimestampValue(remoteProfile.updatedAt);
-      const localHasScore = Number.isFinite(localProfile.scoreTotal);
-      const remoteHasScore = Number.isFinite(remoteProfile.scoreTotal);
+      const localHasScore = Number.isFinite(getProfileScoreTotal(localProfile));
+      const remoteHasScore = Number.isFinite(getProfileScoreTotal(remoteProfile));
       const localHasNotes = Boolean(
         localProfile.notes || localProfile.preNotes || localProfile.postNotes
       );
