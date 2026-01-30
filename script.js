@@ -791,6 +791,10 @@ if (exitTierViewButton) {
 
 initFirebase();
 
+window.addEventListener("beforeunload", () => {
+  saveCountriesLocal();
+});
+
 profileRadios.forEach((radio) => {
   radio.addEventListener("input", (event) => {
     setActiveProfile(event.target.value);
@@ -1263,7 +1267,15 @@ function mergeRemoteCountries(remoteCountries, localCountries) {
       const remoteProfile = remote.profiles?.[key] ?? createEmptyProfile();
       const localStamp = getTimestampValue(localProfile.updatedAt);
       const remoteStamp = getTimestampValue(remoteProfile.updatedAt);
-      acc[key] = localStamp > remoteStamp ? localProfile : remoteProfile;
+      const localHasScore = Number.isFinite(localProfile.scoreTotal);
+      const remoteHasScore = Number.isFinite(remoteProfile.scoreTotal);
+      if (localHasScore && !remoteHasScore) {
+        acc[key] = localProfile;
+      } else if (remoteHasScore && !localHasScore) {
+        acc[key] = remoteProfile;
+      } else {
+        acc[key] = localStamp > remoteStamp ? localProfile : remoteProfile;
+      }
       return acc;
     }, {});
     const average = computeAverageScore(mergedProfiles);
