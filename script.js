@@ -154,7 +154,6 @@ const randomCountryButton = document.getElementById("random-country");
 
 const statusFilter = document.getElementById("status-filter");
 const tierFilter = document.getElementById("tier-filter");
-const profileFilter = document.getElementById("profile-filter");
 const searchInput = document.getElementById("search-input");
 
 const countryCards = document.getElementById("country-cards");
@@ -170,6 +169,14 @@ const summaryVisitedList = document.getElementById("summary-visited-list");
 const summaryPlanningList = document.getElementById("summary-planning-list");
 const summaryNotVisitedList = document.getElementById("summary-not-visited-list");
 const summaryRemainingList = document.getElementById("summary-remaining-list");
+const profileMikeRanked = document.getElementById("profile-mike-ranked");
+const profileMikeNeeded = document.getElementById("profile-mike-needed");
+const profileJenRanked = document.getElementById("profile-jen-ranked");
+const profileJenNeeded = document.getElementById("profile-jen-needed");
+const profileMikeNext = document.getElementById("profile-mike-next");
+const profileJenNext = document.getElementById("profile-jen-next");
+const profileMikeMissingList = document.getElementById("profile-mike-missing-list");
+const profileJenMissingList = document.getElementById("profile-jen-missing-list");
 
 const dialogTitle = document.getElementById("dialog-title");
 const scoreTotalOutput = document.getElementById("score-total");
@@ -470,6 +477,7 @@ function renderSummary() {
     notVisited.map((country) => country.name)
   );
   fillSummaryList(summaryRemainingList, availableCountries);
+  updateProfileTracker();
 }
 
 function fillSummaryList(list, items) {
@@ -685,8 +693,22 @@ if (autoTierToggle) {
   autoTierToggle.addEventListener("input", updateScorePreview);
 }
 
-if (profileFilter) {
-  profileFilter.addEventListener("input", renderCountryOptions);
+if (profileMikeNext) {
+  profileMikeNext.addEventListener("click", () => {
+    const stats = getProfileStats();
+    if (stats.mike.missing.length) {
+      openCountryForProfile(stats.mike.missing[0], "mike");
+    }
+  });
+}
+
+if (profileJenNext) {
+  profileJenNext.addEventListener("click", () => {
+    const stats = getProfileStats();
+    if (stats.jen.missing.length) {
+      openCountryForProfile(stats.jen.missing[0], "jen");
+    }
+  });
 }
 
 if (countryInput) {
@@ -843,25 +865,7 @@ function getAvailableCountryOptions() {
   if (!COUNTRY_SOURCE.length) {
     return countries.map((country) => country.name);
   }
-  const profileValue = profileFilter ? profileFilter.value : "all";
-  if (profileValue === "all") {
-    return COUNTRY_SOURCE;
-  }
-  return COUNTRY_SOURCE.filter((name) => {
-    const existing = findCountryByName(name);
-    const mikeScored = Number.isFinite(existing?.profiles?.mike?.scoreTotal);
-    const jenScored = Number.isFinite(existing?.profiles?.jen?.scoreTotal);
-    if (profileValue === "mike-missing") {
-      return !mikeScored;
-    }
-    if (profileValue === "jen-missing") {
-      return !jenScored;
-    }
-    if (profileValue === "both-scored") {
-      return mikeScored && jenScored;
-    }
-    return true;
-  });
+  return COUNTRY_SOURCE;
 }
 
 function isCountryValid(value) {
@@ -982,6 +986,82 @@ function buildProfileBreakdown(profile) {
   return scoreFields
     .map(({ key, label }) => `${label} ${profile.scores[key] ?? "-"}`)
     .join(", ");
+}
+
+function updateProfileTracker() {
+  const totals = getProfileStats();
+  if (profileMikeRanked) {
+    profileMikeRanked.textContent = totals.mike.scored;
+  }
+  if (profileMikeNeeded) {
+    profileMikeNeeded.textContent = totals.mike.missing.length;
+  }
+  if (profileJenRanked) {
+    profileJenRanked.textContent = totals.jen.scored;
+  }
+  if (profileJenNeeded) {
+    profileJenNeeded.textContent = totals.jen.missing.length;
+  }
+  fillProfileMissingList(profileMikeMissingList, totals.mike.missing, "mike");
+  fillProfileMissingList(profileJenMissingList, totals.jen.missing, "jen");
+}
+
+function getProfileStats() {
+  const source = COUNTRY_SOURCE.length ? COUNTRY_SOURCE : countries.map((c) => c.name);
+  const stats = {
+    mike: { scored: 0, missing: [] },
+    jen: { scored: 0, missing: [] },
+  };
+  source.forEach((name) => {
+    const existing = findCountryByName(name);
+    const mikeScored = Number.isFinite(existing?.profiles?.mike?.scoreTotal);
+    const jenScored = Number.isFinite(existing?.profiles?.jen?.scoreTotal);
+    if (mikeScored) {
+      stats.mike.scored += 1;
+    } else {
+      stats.mike.missing.push(name);
+    }
+    if (jenScored) {
+      stats.jen.scored += 1;
+    } else {
+      stats.jen.missing.push(name);
+    }
+  });
+  return stats;
+}
+
+function fillProfileMissingList(list, items, profileKey) {
+  if (!list) {
+    return;
+  }
+  list.innerHTML = "";
+  if (!items.length) {
+    const li = document.createElement("li");
+    li.textContent = "All done!";
+    list.appendChild(li);
+    return;
+  }
+  items.slice(0, 20).forEach((name) => {
+    const li = document.createElement("li");
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = name;
+    button.addEventListener("click", () => openCountryForProfile(name, profileKey));
+    li.appendChild(button);
+    list.appendChild(li);
+  });
+}
+
+function openCountryForProfile(name, profileKey) {
+  const existing = findCountryByName(name);
+  if (existing) {
+    openDialog(existing);
+    setActiveProfile(profileKey, true);
+    return;
+  }
+  openDialog();
+  formFields.name.value = name;
+  setActiveProfile(profileKey, true);
 }
 
 function updateProfileStatus() {

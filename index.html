@@ -110,6 +110,38 @@
             </div>
           </div>
         </details>
+        <div class="summary-card profile-tracker">
+          <h2>Profile Tracker</h2>
+          <div class="summary-grid">
+            <div>
+              <span class="summary-label">Mike ranked</span>
+              <strong id="profile-mike-ranked">0</strong>
+              <span class="summary-label">Still needed</span>
+              <strong id="profile-mike-needed">0</strong>
+              <button class="ghost" id="profile-mike-next">Rank next for Mike</button>
+            </div>
+            <div>
+              <span class="summary-label">Jen ranked</span>
+              <strong id="profile-jen-ranked">0</strong>
+              <span class="summary-label">Still needed</span>
+              <strong id="profile-jen-needed">0</strong>
+              <button class="ghost" id="profile-jen-next">Rank next for Jen</button>
+            </div>
+          </div>
+          <details class="profile-missing">
+            <summary>Show missing lists</summary>
+            <div class="summary-lists">
+              <div>
+                <h3>Needs Mike</h3>
+                <ul id="profile-mike-missing-list"></ul>
+              </div>
+              <div>
+                <h3>Needs Jen</h3>
+                <ul id="profile-jen-missing-list"></ul>
+              </div>
+            </div>
+          </details>
+        </div>
       </section>
 
       <section class="tier-list" aria-label="Tier list">
@@ -234,15 +266,6 @@
               Jen
             </label>
             <div class="profile-status" id="profile-status"></div>
-          </div>
-          <div>
-            <label for="profile-filter">Country list filter</label>
-            <select id="profile-filter">
-              <option value="all">All countries</option>
-              <option value="mike-missing">Needs Mike score</option>
-              <option value="jen-missing">Needs Jen score</option>
-              <option value="both-scored">Both scored</option>
-            </select>
           </div>
           <div>
             <label for="country-days">Time needed</label>
