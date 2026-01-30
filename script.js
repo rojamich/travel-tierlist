@@ -247,6 +247,7 @@ let firestoreReady = false;
 let isMigrating = false;
 let suppressLocalSave = false;
 let hasBackfilled = false;
+let lastBackfillAt = 0;
 
 function normalizeName(value) {
   return value.trim().toLowerCase();
@@ -1439,13 +1440,7 @@ function subscribeToCountries() {
     const remoteCountries = snapshot.docs
       .map((doc) => normalizeCountry({ id: doc.id, ...doc.data() }))
       .filter(Boolean);
-    const hasLocalEdits =
-      generalDirty || Object.values(profileDirty).some((value) => value);
-    if (hasLocalEdits) {
-      countries = mergeRemoteCountries(remoteCountries, countries);
-    } else {
-      countries = mergeRemoteWithLocalExtras(remoteCountries, countries);
-    }
+    countries = mergeRemoteWithLocalExtras(remoteCountries, countries);
     suppressLocalSave = true;
     saveCountriesLocal();
     suppressLocalSave = false;
@@ -1641,7 +1636,11 @@ function syncAllCountries() {
 }
 
 function maybeBackfillFirestore(remoteCountries) {
-  if (hasBackfilled || !firestoreEnabled || !firestoreDb) {
+  if (!firestoreEnabled || !firestoreDb) {
+    return;
+  }
+  const now = Date.now();
+  if (hasBackfilled && now - lastBackfillAt < 30000) {
     return;
   }
   const remoteMap = new Map(remoteCountries.map((country) => [country.id, country]));
@@ -1666,6 +1665,7 @@ function maybeBackfillFirestore(remoteCountries) {
   });
   if (needsBackfill) {
     hasBackfilled = true;
+    lastBackfillAt = now;
   }
 }
 
@@ -1730,9 +1730,10 @@ function mergeRemoteCountries(remoteCountries, localCountries) {
 }
 
 function mergeRemoteWithLocalExtras(remoteCountries, localCountries) {
-  const remoteIds = new Set(remoteCountries.map((country) => country.id));
+  const merged = mergeRemoteCountries(remoteCountries, localCountries);
+  const remoteIds = new Set(merged.map((country) => country.id));
   const extras = localCountries.filter((country) => !remoteIds.has(country.id));
-  return remoteCountries.concat(extras);
+  return merged.concat(extras);
 }
 
 function getTimestampValue(value) {
