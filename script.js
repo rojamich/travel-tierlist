@@ -1439,7 +1439,13 @@ function subscribeToCountries() {
     const remoteCountries = snapshot.docs
       .map((doc) => normalizeCountry({ id: doc.id, ...doc.data() }))
       .filter(Boolean);
-    countries = mergeRemoteCountries(remoteCountries, countries);
+    const hasLocalEdits =
+      generalDirty || Object.values(profileDirty).some((value) => value);
+    if (hasLocalEdits) {
+      countries = mergeRemoteCountries(remoteCountries, countries);
+    } else {
+      countries = mergeRemoteWithLocalExtras(remoteCountries, countries);
+    }
     suppressLocalSave = true;
     saveCountriesLocal();
     suppressLocalSave = false;
@@ -1721,6 +1727,12 @@ function mergeRemoteCountries(remoteCountries, localCountries) {
       flagUrl: remote.flagUrl || local.flagUrl,
     };
   });
+}
+
+function mergeRemoteWithLocalExtras(remoteCountries, localCountries) {
+  const remoteIds = new Set(remoteCountries.map((country) => country.id));
+  const extras = localCountries.filter((country) => !remoteIds.has(country.id));
+  return remoteCountries.concat(extras);
 }
 
 function getTimestampValue(value) {
