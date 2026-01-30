@@ -1265,6 +1265,39 @@ function syncCountry(country, { isNew, forceProfiles = false } = {}) {
   });
 }
 
+function syncCountryProfiles(country, profileKeys) {
+  if (!firestoreEnabled || !firestoreDb || !country?.id) {
+    return Promise.resolve(false);
+  }
+  const keys = Array.isArray(profileKeys) ? profileKeys : [];
+  if (!keys.length) {
+    return Promise.resolve(false);
+  }
+  const docRef = firestoreDb.collection("countries").doc(country.id);
+  const payload = {};
+  keys.forEach((key) => {
+    const profile = country.profiles?.[key] ?? createEmptyProfile();
+    payload[`profiles.${key}`] = {
+      scores: profile.scores,
+      scoreTotal: profile.scoreTotal,
+      notes: profile.notes,
+      preNotes: profile.preNotes,
+      postNotes: profile.postNotes,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    };
+  });
+  return docRef.set(stripUndefined(payload), { merge: true }).then(() => {
+    if (keys.includes(activeProfile)) {
+      dialogProfileDrafts[activeProfile] = {
+        ...dialogProfileDrafts[activeProfile],
+        updatedAt: new Date().toISOString(),
+      };
+      updateProfileStatus();
+    }
+    return true;
+  });
+}
+
 function shouldSyncProfile(profile) {
   if (!profile) {
     return false;
@@ -1284,25 +1317,18 @@ function syncAllCountries() {
   }
   syncNowButton.disabled = true;
   const originalLabel = syncNowButton.textContent;
+  syncNowButton.classList.add("syncing");
   syncNowButton.textContent = "Syncing...";
   const tasks = countries.map((country) => {
-    const profilePayload = PROFILE_KEYS.reduce((acc, key) => {
-      const profile = country.profiles?.[key];
-      if (shouldSyncProfile(profile)) {
-        acc[key] = profile;
-      }
-      return acc;
-    }, {});
-    const payload = {
-      ...country,
-      profiles: profilePayload,
-      scoreAverage: Number.isFinite(country.scoreAverage) ? country.scoreAverage : null,
-    };
-    return syncCountry(payload, { isNew: false, forceProfiles: true });
+    const profileKeys = PROFILE_KEYS.filter((key) =>
+      shouldSyncProfile(country.profiles?.[key])
+    );
+    return syncCountryProfiles(country, profileKeys);
   });
   Promise.allSettled(tasks).finally(() => {
     syncNowButton.disabled = false;
     syncNowButton.textContent = originalLabel;
+    syncNowButton.classList.remove("syncing");
   });
 }
 
@@ -1317,7 +1343,7 @@ function maybeBackfillFirestore(remoteCountries) {
     if (!remoteCountry) {
       return;
     }
-    const missingProfileScores = PROFILE_KEYS.some((key) => {
+    const missingProfileKeys = PROFILE_KEYS.filter((key) => {
       const localScore = localCountry.profiles?.[key]?.scoreTotal;
       const remoteScore = remoteCountry.profiles?.[key]?.scoreTotal;
       return Number.isFinite(localScore) && !Number.isFinite(remoteScore);
@@ -1325,9 +1351,9 @@ function maybeBackfillFirestore(remoteCountries) {
     const missingAverage =
       Number.isFinite(localCountry.scoreAverage) &&
       !Number.isFinite(remoteCountry.scoreAverage);
-    if (missingProfileScores || missingAverage) {
+    if (missingProfileKeys.length || missingAverage) {
       needsBackfill = true;
-      syncCountry(localCountry, { isNew: false, forceProfiles: true });
+      syncCountryProfiles(localCountry, missingProfileKeys);
     }
   });
   if (needsBackfill) {

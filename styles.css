@@ -90,6 +90,43 @@ main {
   flex-wrap: wrap;
 }
 
+#sync-now {
+  position: relative;
+  overflow: hidden;
+}
+
+#sync-now.syncing {
+  opacity: 0.85;
+  pointer-events: none;
+}
+
+#sync-now.syncing::after {
+  content: "";
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  margin-top: -7px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: sync-spin 0.8s linear infinite;
+}
+
+#sync-now.syncing::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 2px;
+  width: 100%;
+  background: currentColor;
+  opacity: 0.35;
+  transform: translateX(-100%);
+  animation: sync-bar 1.2s ease-in-out infinite;
+}
+
 .site-header h1 {
   margin: 0 0 0.5rem;
   font-size: clamp(2rem, 3vw, 2.6rem);
@@ -764,6 +801,24 @@ dialog::backdrop {
     flex-direction: column;
     gap: 0.75rem;
     align-items: stretch;
+  }
+}
+
+@keyframes sync-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes sync-bar {
+  0% {
+    transform: translateX(-100%);
+  }
+  60% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(100%);
   }
 }
 
