@@ -616,6 +616,8 @@ form.addEventListener("submit", (event) => {
   }
 
   const isNew = !activeId;
+  profileDirty[activeProfile] = true;
+  generalDirty = true;
   upsertCountry(data);
   syncCountry(data, { isNew });
   closeDialog();
@@ -699,9 +701,11 @@ profileInputs.forEach((input) => {
   if (!input) {
     return;
   }
-  input.addEventListener("input", () => {
+  const markDirty = () => {
     profileDirty[activeProfile] = true;
-  });
+  };
+  input.addEventListener("input", markDirty);
+  input.addEventListener("change", markDirty);
 });
 
 const generalInputs = [
@@ -717,9 +721,11 @@ generalInputs.forEach((input) => {
   if (!input) {
     return;
   }
-  input.addEventListener("input", () => {
+  const markDirty = () => {
     generalDirty = true;
-  });
+  };
+  input.addEventListener("input", markDirty);
+  input.addEventListener("change", markDirty);
 });
 
 if (toggleTierViewButton) {
