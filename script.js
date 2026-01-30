@@ -1223,7 +1223,7 @@ function ensurePexelsApiKey() {
 }
 
 function buildPexelsQuery(countryName) {
-  return countryName;
+  return `top sights and attractions of ${countryName}`;
 }
 
 function fetchPexelsPhotos(countryName) {
