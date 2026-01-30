@@ -906,6 +906,9 @@ if (regeneratePhotosButton) {
     }
     regeneratePhotosButton.disabled = true;
     regeneratePhotosButton.textContent = "Fetching...";
+    if (galleryStatus) {
+      galleryStatus.textContent = "Fetching photos from Pexels...";
+    }
     const countryName = formFields.name.value.trim();
     fetchPexelsPhotos(countryName).then((photos) => {
       const targetId = activeId || normalizeName(countryName).replace(/\s+/g, "-");
@@ -937,6 +940,9 @@ if (regeneratePhotosButton) {
       }
       renderGallery(photos);
       render();
+      if (!photos.length && galleryStatus) {
+        galleryStatus.textContent = "No results found. Try another country name.";
+      }
     }).finally(() => {
       regeneratePhotosButton.disabled = false;
       regeneratePhotosButton.textContent = "Regenerate photos";
@@ -1217,7 +1223,7 @@ function ensurePexelsApiKey() {
 }
 
 function buildPexelsQuery(countryName) {
-  return `attractions ${countryName}`;
+  return countryName;
 }
 
 function fetchPexelsPhotos(countryName) {
@@ -1234,7 +1240,7 @@ function fetchPexelsPhotos(countryName) {
   })
     .then((response) => {
       if (!response.ok) {
-        throw new Error("Pexels request failed.");
+        throw new Error(`Pexels request failed (${response.status}).`);
       }
       return response.json();
     })
@@ -1243,13 +1249,18 @@ function fetchPexelsPhotos(countryName) {
         return [];
       }
       return data.photos.slice(0, PEXELS_RESULTS).map((photo) => ({
-        src: photo?.src?.medium || photo?.src?.large || "",
+        src: photo?.src?.landscape || photo?.src?.medium || photo?.src?.large || "",
         alt: photo?.alt || `${countryName} attraction`,
         photographer: photo?.photographer || "Pexels",
         url: photo?.url || "",
       })).filter((photo) => photo.src);
     })
-    .catch(() => []);
+    .catch((error) => {
+      if (galleryStatus) {
+        galleryStatus.textContent = `Photo fetch failed. ${error.message}`;
+      }
+      return [];
+    });
 }
 
 function formatTimestamp(value) {
