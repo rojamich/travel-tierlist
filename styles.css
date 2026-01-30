@@ -601,6 +601,10 @@ dialog::backdrop {
   flex-wrap: wrap;
 }
 
+.profile-switch.near-score {
+  margin-top: 0.5rem;
+}
+
 .profile-switch span {
   font-weight: 700;
   font-size: 0.85rem;
@@ -636,6 +640,7 @@ dialog::backdrop {
   cursor: pointer;
   color: var(--muted);
   transition: background 0.15s ease, color 0.15s ease;
+  box-shadow: none;
 }
 
 .profile-tab.active {
@@ -656,6 +661,16 @@ dialog::backdrop {
 
 .dialog-form.jen-profile {
   background: linear-gradient(180deg, rgba(44, 95, 158, 0.08), transparent 45%);
+}
+
+.dialog-form.mike-profile .score-section {
+  background: var(--mike-soft);
+  border-color: rgba(178, 77, 58, 0.35);
+}
+
+.dialog-form.jen-profile .score-section {
+  background: var(--jen-soft);
+  border-color: rgba(44, 95, 158, 0.35);
 }
 
 .profile-tracker .summary-grid {
