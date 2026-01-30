@@ -198,6 +198,7 @@ const revealScoreButton = document.getElementById("reveal-score");
 const profileRadios = Array.from(
   document.querySelectorAll('input[name="profile"]')
 );
+const profileTabs = Array.from(document.querySelectorAll(".profile-tab"));
 const revealDialog = document.getElementById("score-reveal-dialog");
 const revealCloseButton = document.getElementById("close-reveal");
 const revealTitle = document.getElementById("reveal-title");
@@ -926,6 +927,12 @@ profileRadios.forEach((radio) => {
   });
 });
 
+profileTabs.forEach((button) => {
+  button.addEventListener("click", () => {
+    setActiveProfile(button.dataset.profile);
+  });
+});
+
 if (randomCountryButton) {
   randomCountryButton.addEventListener("click", () => {
     const remaining = getRemainingCountries();
@@ -1161,6 +1168,16 @@ function setActiveProfile(profile, force = false) {
   profileRadios.forEach((radio) => {
     radio.checked = radio.value === activeProfile;
   });
+
+  profileTabs.forEach((button) => {
+    const isActive = button.dataset.profile === activeProfile;
+    button.classList.toggle("active", isActive);
+  });
+
+  if (form) {
+    form.classList.toggle("mike-profile", activeProfile === "mike");
+    form.classList.toggle("jen-profile", activeProfile === "jen");
+  }
 
   const profileData = dialogProfileDrafts[activeProfile] || createEmptyProfile();
   formFields.notes.value = profileData.notes || "";

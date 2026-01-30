@@ -257,15 +257,17 @@
             <input id="country-best-time" name="bestTime" placeholder="e.g. Apr-Jun" />
           </div>
           <div class="full-width profile-switch">
-            <span>Profile</span>
-            <label>
-              <input type="radio" name="profile" value="mike" checked />
-              Mike
-            </label>
-            <label>
-              <input type="radio" name="profile" value="jen" />
-              Jen
-            </label>
+            <div class="profile-switch-header">
+              <span>Profile</span>
+              <div class="profile-tabs">
+                <button type="button" class="profile-tab" data-profile="mike">
+                  Mike
+                </button>
+                <button type="button" class="profile-tab" data-profile="jen">
+                  Jen
+                </button>
+              </div>
+            </div>
             <div class="profile-status" id="profile-status"></div>
           </div>
           <div>

@@ -11,6 +11,10 @@
   --accent-dark: #0a3a46;
   --border: #e3d7c6;
   --shadow: 0 20px 40px rgba(20, 20, 20, 0.08);
+  --mike-soft: #f3dfd8;
+  --mike-strong: #b24d3a;
+  --jen-soft: #dbe9f6;
+  --jen-strong: #2c5f9e;
   --tier-s: #0f4c5c;
   --tier-s-light: #d6f0ec;
   --tier-a: #1b7f5a;
@@ -589,11 +593,12 @@ dialog::backdrop {
 .profile-switch {
   display: flex;
   align-items: center;
-  gap: 1rem;
-  padding: 0.75rem 1rem;
-  border-radius: 0.75rem;
+  gap: 0.75rem;
+  padding: 0.6rem 0.8rem;
+  border-radius: 0.85rem;
   border: 1px dashed var(--border);
   background: #fffaf2;
+  flex-wrap: wrap;
 }
 
 .profile-switch span {
@@ -601,18 +606,56 @@ dialog::backdrop {
   font-size: 0.85rem;
 }
 
-.profile-switch label {
-  display: inline-flex;
+.profile-switch-header {
+  display: flex;
   align-items: center;
-  gap: 0.4rem;
-  font-weight: 600;
-  font-size: 0.85rem;
+  gap: 0.75rem;
+  flex-wrap: wrap;
 }
 
 .profile-status {
   margin-left: auto;
   font-size: 0.8rem;
   color: var(--muted);
+}
+
+.profile-tabs {
+  display: inline-flex;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: #fff;
+  overflow: hidden;
+}
+
+.profile-tab {
+  border: none;
+  background: transparent;
+  padding: 0.35rem 0.9rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  color: var(--muted);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.profile-tab.active {
+  color: #fff;
+}
+
+.profile-tab[data-profile="mike"].active {
+  background: var(--mike-strong);
+}
+
+.profile-tab[data-profile="jen"].active {
+  background: var(--jen-strong);
+}
+
+.dialog-form.mike-profile {
+  background: linear-gradient(180deg, rgba(178, 77, 58, 0.08), transparent 45%);
+}
+
+.dialog-form.jen-profile {
+  background: linear-gradient(180deg, rgba(44, 95, 158, 0.08), transparent 45%);
 }
 
 .profile-tracker .summary-grid {
