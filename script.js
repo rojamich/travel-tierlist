@@ -634,11 +634,11 @@ form.addEventListener("submit", (event) => {
     return;
   }
 
-  const existing = countries.find(
+  const existingCountry = countries.find(
     (country) => normalizeName(country.name) === normalizeName(data.name)
   );
-  if (existing && !activeId) {
-    openDialog(existing);
+  if (existingCountry && !activeId) {
+    openDialog(existingCountry);
     return;
   }
 
@@ -709,9 +709,9 @@ if (countryInput) {
     if (!value) {
       return;
     }
-    const existing = findCountryByName(value);
-    if (existing && (!activeId || existing.id !== activeId)) {
-      openDialog(existing);
+    const selectedCountry = findCountryByName(value);
+    if (selectedCountry && (!activeId || selectedCountry.id !== activeId)) {
+      openDialog(selectedCountry);
     }
   });
 }
