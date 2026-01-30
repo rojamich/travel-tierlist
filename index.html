@@ -284,6 +284,21 @@
             <label for="country-flag">Flag icon URL</label>
             <input id="country-flag" name="flag" placeholder="Paste image URL" />
           </div>
+          <div class="full-width photo-gallery">
+            <div class="gallery-header">
+              <div>
+                <h3>Attraction gallery</h3>
+                <p>Auto-pulled from Pexels. Saved per country.</p>
+              </div>
+              <button type="button" class="ghost" id="regenerate-photos">
+                Regenerate photos
+              </button>
+            </div>
+            <div class="gallery-grid" id="photo-gallery"></div>
+            <p class="helper" id="photo-gallery-status">
+              No photos yet. Click regenerate to fetch five.
+            </p>
+          </div>
           <div class="full-width score-section">
             <div class="score-header">
               <div>

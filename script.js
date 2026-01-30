@@ -1,5 +1,7 @@
 const STORAGE_KEY = "travelTierListData";
 const MIGRATION_KEY = "travelTierListMigrated";
+const PEXELS_KEY_STORAGE = "pexelsApiKey";
+const PEXELS_RESULTS = 5;
 const COUNTRY_SOURCE = Array.isArray(window.ALL_COUNTRIES)
   ? window.ALL_COUNTRIES
   : [];
@@ -196,6 +198,9 @@ const revealBreakdown = document.getElementById("reveal-breakdown");
 const revealTier = document.getElementById("reveal-tier");
 const scoreSection = document.querySelector(".score-section");
 const profileStatus = document.getElementById("profile-status");
+const galleryContainer = document.getElementById("photo-gallery");
+const galleryStatus = document.getElementById("photo-gallery-status");
+const regeneratePhotosButton = document.getElementById("regenerate-photos");
 const formFields = {
   id: null,
   name: document.getElementById("country-name"),
@@ -309,6 +314,8 @@ function normalizeCountry(country) {
         ? rawAverage
         : null,
     flagUrl: country?.flagUrl || "",
+    images: Array.isArray(country?.images) ? country.images : [],
+    attractions: Array.isArray(country?.attractions) ? country.attractions : [],
   };
 }
 
@@ -536,6 +543,7 @@ function openDialog(country = null) {
     formFields.days.value = country.days || "";
     formFields.budget.value = country.budget || "";
     formFields.flag.value = country.flagUrl || "";
+    renderGallery(country.images || []);
     dialogProfileDrafts = cloneProfiles(country.profiles);
     activeProfile = "mike";
     profileDirty = { mike: false, jen: false };
@@ -555,6 +563,7 @@ function openDialog(country = null) {
     }
     formFields.tier.value = "unranked";
     formFields.flag.value = "";
+    renderGallery([]);
     dialogProfileDrafts = {
       mike: createEmptyProfile(),
       jen: createEmptyProfile(),
@@ -594,6 +603,42 @@ function upsertCountry(data) {
   }
   saveCountries();
   render();
+}
+
+function renderGallery(images) {
+  if (!galleryContainer || !galleryStatus) {
+    return;
+  }
+  galleryContainer.innerHTML = "";
+  if (!images || !images.length) {
+    galleryStatus.textContent = "No photos yet. Click regenerate to fetch five.";
+    return;
+  }
+  galleryStatus.textContent = `Showing ${images.length} photos.`;
+  images.forEach((image) => {
+    const figure = document.createElement("figure");
+    figure.className = "gallery-card";
+    const img = document.createElement("img");
+    img.src = image.src;
+    img.alt = image.alt || "Travel photo";
+    img.loading = "lazy";
+    const caption = document.createElement("figcaption");
+    if (image.url && image.photographer) {
+      const link = document.createElement("a");
+      link.href = image.url;
+      link.target = "_blank";
+      link.rel = "noreferrer";
+      link.textContent = image.photographer;
+      caption.appendChild(document.createTextNode("Photo by "));
+      caption.appendChild(link);
+      caption.appendChild(document.createTextNode(" / Pexels"));
+    } else {
+      caption.textContent = "Pexels";
+    }
+    figure.appendChild(img);
+    figure.appendChild(caption);
+    galleryContainer.appendChild(figure);
+  });
 }
 
 function deleteCountry() {
@@ -638,6 +683,8 @@ form.addEventListener("submit", (event) => {
     profiles: cloneProfiles(mergedProfiles),
     scoreAverage: Number.isFinite(averageScore) ? averageScore : null,
     flagUrl: formFields.flag.value.trim(),
+    images: activeCountry?.images || [],
+    attractions: activeCountry?.attractions || [],
   };
 
   if (autoTierToggle && autoTierToggle.checked && scoreTier !== "unranked") {
@@ -848,6 +895,52 @@ if (revealScoreButton) {
 if (revealCloseButton && revealDialog) {
   revealCloseButton.addEventListener("click", () => {
     revealDialog.close();
+  });
+}
+
+if (regeneratePhotosButton) {
+  regeneratePhotosButton.addEventListener("click", () => {
+    if (!formFields.name.value.trim()) {
+      formFields.name.focus();
+      return;
+    }
+    regeneratePhotosButton.disabled = true;
+    regeneratePhotosButton.textContent = "Fetching...";
+    const countryName = formFields.name.value.trim();
+    fetchPexelsPhotos(countryName).then((photos) => {
+      const targetId = activeId || normalizeName(countryName).replace(/\s+/g, "-");
+      const existing = countries.find((country) => country.id === targetId);
+      if (existing) {
+        existing.images = photos;
+        saveCountries();
+        syncCountry(existing, { isNew: false, forceProfiles: false });
+      } else {
+        countries.push({
+          id: targetId,
+          name: countryName,
+          status: formFields.status.value || "not-visited",
+          tier: formFields.tier.value || "unranked",
+          bestTime: formFields.bestTime.value.trim(),
+          days: formFields.days.value.trim(),
+          budget: formFields.budget.value.trim(),
+          profiles: cloneProfiles(dialogProfileDrafts),
+          scoreAverage: null,
+          flagUrl: formFields.flag.value.trim(),
+          images: photos,
+          attractions: [],
+        });
+        saveCountries();
+        const fresh = countries.find((country) => country.id === targetId);
+        if (fresh) {
+          syncCountry(fresh, { isNew: true, forceProfiles: true });
+        }
+      }
+      renderGallery(photos);
+      render();
+    }).finally(() => {
+      regeneratePhotosButton.disabled = false;
+      regeneratePhotosButton.textContent = "Regenerate photos";
+    });
   });
 }
 
@@ -1106,6 +1199,59 @@ function updateProfileStatus() {
   profileStatus.textContent = `Last saved - Mike: ${mikeStamp} | Jen: ${jenStamp}`;
 }
 
+function getPexelsApiKey() {
+  return localStorage.getItem(PEXELS_KEY_STORAGE) || "";
+}
+
+function ensurePexelsApiKey() {
+  let apiKey = getPexelsApiKey();
+  if (apiKey) {
+    return apiKey;
+  }
+  apiKey = window.prompt("Enter your Pexels API key to fetch photos:");
+  if (!apiKey) {
+    return "";
+  }
+  localStorage.setItem(PEXELS_KEY_STORAGE, apiKey.trim());
+  return apiKey.trim();
+}
+
+function buildPexelsQuery(countryName) {
+  return `attractions ${countryName}`;
+}
+
+function fetchPexelsPhotos(countryName) {
+  const apiKey = ensurePexelsApiKey();
+  if (!apiKey) {
+    return Promise.resolve([]);
+  }
+  const query = encodeURIComponent(buildPexelsQuery(countryName));
+  const url = `https://api.pexels.com/v1/search?query=${query}&per_page=${PEXELS_RESULTS}&orientation=landscape`;
+  return fetch(url, {
+    headers: {
+      Authorization: apiKey,
+    },
+  })
+    .then((response) => {
+      if (!response.ok) {
+        throw new Error("Pexels request failed.");
+      }
+      return response.json();
+    })
+    .then((data) => {
+      if (!Array.isArray(data?.photos)) {
+        return [];
+      }
+      return data.photos.slice(0, PEXELS_RESULTS).map((photo) => ({
+        src: photo?.src?.medium || photo?.src?.large || "",
+        alt: photo?.alt || `${countryName} attraction`,
+        photographer: photo?.photographer || "Pexels",
+        url: photo?.url || "",
+      })).filter((photo) => photo.src);
+    })
+    .catch(() => []);
+}
+
 function formatTimestamp(value) {
   if (!value) {
     return "Never";
@@ -1204,6 +1350,8 @@ function maybeMigrateLocalToFirestore() {
       profiles: normalized.profiles,
       scoreAverage: normalized.scoreAverage,
       flagUrl: normalized.flagUrl,
+      images: normalized.images,
+      attractions: normalized.attractions,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
     }), { merge: true });
   });
@@ -1229,6 +1377,8 @@ function syncCountry(country, { isNew, forceProfiles = false } = {}) {
     budget: country.budget,
     scoreAverage: country.scoreAverage,
     flagUrl: country.flagUrl,
+    images: Array.isArray(country.images) ? country.images : [],
+    attractions: Array.isArray(country.attractions) ? country.attractions : [],
     updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
   };
 
