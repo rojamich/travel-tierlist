@@ -230,6 +230,7 @@ let firestoreDb = null;
 let firestoreReady = false;
 let isMigrating = false;
 let suppressLocalSave = false;
+let hasBackfilled = false;
 
 function normalizeName(value) {
   return value.trim().toLowerCase();
@@ -1154,6 +1155,7 @@ function subscribeToCountries() {
     suppressLocalSave = true;
     saveCountriesLocal();
     suppressLocalSave = false;
+    maybeBackfillFirestore(remoteCountries);
     render();
   });
 }
@@ -1226,13 +1228,17 @@ function syncCountry(country, { isNew, forceProfiles = false } = {}) {
       return;
     }
     const profile = country.profiles?.[key] ?? createEmptyProfile();
+    const shouldStamp =
+      profileDirty[key] || (includeAllProfiles && !profile.updatedAt);
     profilePayload[`profiles.${key}`] = {
       scores: profile.scores,
       scoreTotal: profile.scoreTotal,
       notes: profile.notes,
       preNotes: profile.preNotes,
       postNotes: profile.postNotes,
-      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      updatedAt: shouldStamp
+        ? firebase.firestore.FieldValue.serverTimestamp()
+        : profile.updatedAt ?? null,
     };
   });
 
@@ -1251,6 +1257,35 @@ function syncCountry(country, { isNew, forceProfiles = false } = {}) {
     profileDirty = { mike: false, jen: false };
     generalDirty = false;
   });
+}
+
+function maybeBackfillFirestore(remoteCountries) {
+  if (hasBackfilled || !firestoreEnabled || !firestoreDb) {
+    return;
+  }
+  const remoteMap = new Map(remoteCountries.map((country) => [country.id, country]));
+  let needsBackfill = false;
+  countries.forEach((localCountry) => {
+    const remoteCountry = remoteMap.get(localCountry.id);
+    if (!remoteCountry) {
+      return;
+    }
+    const missingProfileScores = PROFILE_KEYS.some((key) => {
+      const localScore = localCountry.profiles?.[key]?.scoreTotal;
+      const remoteScore = remoteCountry.profiles?.[key]?.scoreTotal;
+      return Number.isFinite(localScore) && !Number.isFinite(remoteScore);
+    });
+    const missingAverage =
+      Number.isFinite(localCountry.scoreAverage) &&
+      !Number.isFinite(remoteCountry.scoreAverage);
+    if (missingProfileScores || missingAverage) {
+      needsBackfill = true;
+      syncCountry(localCountry, { isNew: false, forceProfiles: true });
+    }
+  });
+  if (needsBackfill) {
+    hasBackfilled = true;
+  }
 }
 
 function deleteCountryRemote(id) {
