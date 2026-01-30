@@ -272,10 +272,11 @@ function normalizeCountry(country) {
         }, {})
       : null;
     const computedTotal = computeScoreTotal(normalizedScores);
+    const rawTotal = Number(profile?.scoreTotal);
     let normalizedTotal = Number.isFinite(computedTotal)
       ? computedTotal
-      : Number.isFinite(profile?.scoreTotal)
-        ? profile.scoreTotal
+      : Number.isFinite(rawTotal)
+        ? rawTotal
         : null;
     if (!Number.isFinite(normalizedTotal) || normalizedTotal < 5) {
       normalizedTotal = null;
@@ -292,6 +293,7 @@ function normalizeCountry(country) {
   }, {});
 
   const normalizedTotal = computeAverageScore(normalizedProfiles);
+  const rawAverage = Number(country?.scoreAverage);
   return {
     ...country,
     name: country.name,
@@ -301,7 +303,11 @@ function normalizeCountry(country) {
     days: country.days || "",
     budget: country.budget || "",
     profiles: normalizedProfiles,
-    scoreAverage: Number.isFinite(normalizedTotal) ? normalizedTotal : null,
+    scoreAverage: Number.isFinite(normalizedTotal)
+      ? normalizedTotal
+      : Number.isFinite(rawAverage)
+        ? rawAverage
+        : null,
     flagUrl: country?.flagUrl || "",
   };
 }
