@@ -312,7 +312,6 @@ function saveCountries() {
 function matchesFilters(country) {
   const statusValue = statusFilter.value;
   const tierValue = tierFilter.value;
-  const profileValue = profileFilter ? profileFilter.value : "all";
   const query = searchInput.value.trim().toLowerCase();
 
   if (statusValue !== "all" && country.status !== statusValue) {
@@ -321,20 +320,6 @@ function matchesFilters(country) {
 
   if (tierValue !== "all" && country.tier !== tierValue) {
     return false;
-  }
-
-  if (profileValue !== "all") {
-    const mikeScored = Number.isFinite(country.profiles?.mike?.scoreTotal);
-    const jenScored = Number.isFinite(country.profiles?.jen?.scoreTotal);
-    if (profileValue === "mike-missing" && mikeScored) {
-      return false;
-    }
-    if (profileValue === "jen-missing" && jenScored) {
-      return false;
-    }
-    if (profileValue === "both-scored" && !(mikeScored && jenScored)) {
-      return false;
-    }
   }
 
   if (query) {
@@ -684,7 +669,7 @@ if (resetButton) {
 openAddButton.addEventListener("click", () => openDialog());
 closeDialogButton.addEventListener("click", closeDialog);
 
-[statusFilter, tierFilter, profileFilter, searchInput].forEach((input) => {
+[statusFilter, tierFilter, searchInput].forEach((input) => {
   input.addEventListener("input", render);
 });
 
@@ -698,6 +683,10 @@ Object.values(formFields.scores).forEach((input) => {
 
 if (autoTierToggle) {
   autoTierToggle.addEventListener("input", updateScorePreview);
+}
+
+if (profileFilter) {
+  profileFilter.addEventListener("input", renderCountryOptions);
 }
 
 if (countryInput) {
@@ -854,7 +843,25 @@ function getAvailableCountryOptions() {
   if (!COUNTRY_SOURCE.length) {
     return countries.map((country) => country.name);
   }
-  return COUNTRY_SOURCE;
+  const profileValue = profileFilter ? profileFilter.value : "all";
+  if (profileValue === "all") {
+    return COUNTRY_SOURCE;
+  }
+  return COUNTRY_SOURCE.filter((name) => {
+    const existing = findCountryByName(name);
+    const mikeScored = Number.isFinite(existing?.profiles?.mike?.scoreTotal);
+    const jenScored = Number.isFinite(existing?.profiles?.jen?.scoreTotal);
+    if (profileValue === "mike-missing") {
+      return !mikeScored;
+    }
+    if (profileValue === "jen-missing") {
+      return !jenScored;
+    }
+    if (profileValue === "both-scored") {
+      return mikeScored && jenScored;
+    }
+    return true;
+  });
 }
 
 function isCountryValid(value) {
@@ -896,6 +903,7 @@ function cloneProfiles(profiles) {
       notes: profile.notes || "",
       preNotes: profile.preNotes || "",
       postNotes: profile.postNotes || "",
+      updatedAt: profile.updatedAt || null,
     };
     return acc;
   }, {});
@@ -1117,7 +1125,7 @@ function syncCountry(country, { isNew, forceProfiles = false } = {}) {
       return;
     }
     const profile = country.profiles?.[key] ?? createEmptyProfile();
-    profilePayload[key] = {
+    profilePayload[`profiles.${key}`] = {
       scores: profile.scores,
       scoreTotal: profile.scoreTotal,
       notes: profile.notes,
@@ -1127,9 +1135,7 @@ function syncCountry(country, { isNew, forceProfiles = false } = {}) {
     };
   });
 
-  if (Object.keys(profilePayload).length) {
-    payload.profiles = profilePayload;
-  }
+  Object.assign(payload, profilePayload);
 
   if (!generalDirty && !Object.keys(profilePayload).length && !isNew) {
     return;
