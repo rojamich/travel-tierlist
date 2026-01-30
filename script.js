@@ -602,8 +602,14 @@ form.addEventListener("submit", (event) => {
   if (countryInput) {
     countryInput.setCustomValidity("");
   }
-  const existing = activeId ? countries.find((country) => country.id === activeId) : null;
-  const mergedProfiles = mergeProfiles(existing?.profiles, dialogProfileDrafts, activeProfile);
+  const activeCountry = activeId
+    ? countries.find((country) => country.id === activeId)
+    : null;
+  const mergedProfiles = mergeProfiles(
+    activeCountry?.profiles,
+    dialogProfileDrafts,
+    activeProfile
+  );
   const averageScore = computeAverageScore(mergedProfiles);
   const scoreTier = getScoreTier(averageScore);
   const data = {
