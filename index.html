@@ -18,8 +18,12 @@
         <h1>Travel Tier List</h1>
         <p>Rank countries by your own criteria and keep quick trip-planning facts in one place.</p>
       </div>
-      <button class="primary" id="open-add-country">Add Country</button>
+      <div class="header-actions">
+        <button class="ghost" id="toggle-tier-view">Tier-only view</button>
+        <button class="primary" id="open-add-country">Add Country</button>
+      </div>
     </header>
+    <button class="ghost tier-exit" id="exit-tier-view">Exit tier-only</button>
 
     <main>
       <section class="controls" aria-label="Filters">
@@ -191,7 +195,7 @@
           <div>
             <label for="country-name">Country</label>
             <div class="field-row">
-              <select id="country-name" name="name" required></select>
+              <input id="country-name" name="name" list="country-options" required />
               <button type="button" class="ghost" id="random-country">Random</button>
             </div>
             <p class="helper" id="country-availability">0 countries remaining</p>
@@ -241,6 +245,10 @@
           <div class="full-width">
             <label for="country-notes">Profile notes (Mike/Jen)</label>
             <textarea id="country-notes" name="notes" rows="3"></textarea>
+          </div>
+          <div>
+            <label for="country-flag">Flag icon URL</label>
+            <input id="country-flag" name="flag" placeholder="Paste image URL" />
           </div>
           <div class="full-width score-section">
             <div class="score-header">
@@ -332,23 +340,11 @@
             <label for="country-post-notes">After-the-trip notes (profile)</label>
             <textarea id="country-post-notes" name="postNotes" rows="2"></textarea>
           </div>
-          <div class="full-width">
-            <label for="country-attractions">Top attractions (optional)</label>
-            <textarea id="country-attractions" name="attractions" rows="2"></textarea>
-          </div>
-          <div class="full-width">
-            <label for="country-images">Image URLs (optional)</label>
-            <textarea
-              id="country-images"
-              name="images"
-              rows="2"
-              placeholder="Paste a few image URLs, separated by commas"
-            ></textarea>
-          </div>
         </div>
 
         <footer>
           <button type="button" class="ghost" id="delete-country">Delete</button>
+          <button type="button" class="ghost" id="reset-country">Reset</button>
           <button type="submit" class="primary">Save</button>
         </footer>
       </form>
@@ -413,21 +409,15 @@
         <div class="reveal-body">
           <div class="reveal-score">
             <h3>Score</h3>
+            <div class="reveal-tier" id="reveal-tier">-</div>
             <p id="reveal-score-value"></p>
             <p id="reveal-breakdown"></p>
-          </div>
-          <div class="reveal-images">
-            <h3>Photo highlights</h3>
-            <div class="reveal-gallery" id="reveal-gallery"></div>
-            <p class="helper" id="reveal-gallery-note"></p>
-          </div>
-          <div class="reveal-attractions">
-            <h3>Top attractions</h3>
-            <ul id="reveal-attractions"></ul>
           </div>
         </div>
       </div>
     </dialog>
+
+    <datalist id="country-options"></datalist>
 
     <script src="countries.js"></script>
     <script src="script.js"></script>

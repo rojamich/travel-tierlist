@@ -83,6 +83,13 @@ main {
   box-shadow: var(--shadow);
 }
 
+.header-actions {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
 .site-header h1 {
   margin: 0 0 0.5rem;
   font-size: clamp(2rem, 3vw, 2.6rem);
@@ -131,7 +138,7 @@ main {
   gap: 0.75rem;
 }
 
-.field-row select {
+.field-row input {
   flex: 1;
 }
 
@@ -207,6 +214,20 @@ main {
   font-size: 0.75rem;
   color: var(--muted);
   font-weight: 500;
+}
+
+.tier-pill .tier-name {
+  font-size: 0.9rem;
+  color: var(--text);
+  font-weight: 700;
+}
+
+.tier-flag {
+  width: 26px;
+  height: 18px;
+  object-fit: cover;
+  border-radius: 4px;
+  border: 1px solid rgba(0, 0, 0, 0.15);
 }
 
 .score-badge {
@@ -639,39 +660,47 @@ dialog::backdrop {
   gap: 1.5rem;
 }
 
-.reveal-score h3,
-.reveal-images h3,
-.reveal-attractions h3 {
+.reveal-score h3 {
   margin: 0 0 0.5rem;
 }
 
-.reveal-gallery {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  gap: 0.75rem;
-}
-
-.reveal-gallery img {
-  width: 100%;
+.reveal-tier {
+  width: 120px;
   height: 120px;
-  object-fit: cover;
-  border-radius: 0.75rem;
-  border: 1px solid var(--border);
+  border-radius: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 3rem;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 0.75rem;
+  background: var(--tier-u);
 }
 
-.reveal-placeholder {
-  padding: 1rem;
-  border-radius: 0.75rem;
-  border: 1px dashed var(--border);
-  background: #fff7e8;
-  color: var(--muted);
-  text-align: center;
+.reveal-tier[data-tier="S"] {
+  background: var(--tier-s);
 }
 
-.reveal-attractions ul {
-  margin: 0;
-  padding-left: 1.2rem;
-  color: var(--muted);
+.reveal-tier[data-tier="A"] {
+  background: var(--tier-a);
+}
+
+.reveal-tier[data-tier="B"] {
+  background: var(--tier-b);
+}
+
+.reveal-tier[data-tier="C"] {
+  background: var(--tier-c);
+  color: #2c1900;
+}
+
+.reveal-tier[data-tier="D"] {
+  background: var(--tier-d);
+}
+
+.reveal-tier[data-tier="unranked"] {
+  background: var(--tier-u);
 }
 
 @media (max-width: 720px) {
@@ -698,4 +727,28 @@ dialog::backdrop {
     gap: 0.75rem;
     align-items: stretch;
   }
+}
+
+body.tier-only .controls,
+body.tier-only .summary,
+body.tier-only .country-list,
+body.tier-only .site-header {
+  display: none;
+}
+
+body.tier-only main {
+  padding: 2.5rem clamp(1.5rem, 4vw, 3.5rem);
+}
+
+.tier-exit {
+  position: fixed;
+  top: 1.5rem;
+  right: 1.5rem;
+  z-index: 5;
+  display: none;
+  background: #fff;
+}
+
+body.tier-only .tier-exit {
+  display: inline-flex;
 }

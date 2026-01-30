@@ -195,3 +195,5 @@ const ALL_COUNTRIES = [
   "Zambia",
   "Zimbabwe"
 ];
+
+window.ALL_COUNTRIES = ALL_COUNTRIES;

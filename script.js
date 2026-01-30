@@ -133,7 +133,11 @@ const form = document.getElementById("country-form");
 const openAddButton = document.getElementById("open-add-country");
 const closeDialogButton = document.getElementById("close-dialog");
 const deleteButton = document.getElementById("delete-country");
-const countrySelect = document.getElementById("country-name");
+const resetButton = document.getElementById("reset-country");
+const toggleTierViewButton = document.getElementById("toggle-tier-view");
+const exitTierViewButton = document.getElementById("exit-tier-view");
+const countryInput = document.getElementById("country-name");
+const countryOptions = document.getElementById("country-options");
 const countryAvailability = document.getElementById("country-availability");
 const randomCountryButton = document.getElementById("random-country");
 
@@ -169,9 +173,7 @@ const revealTitle = document.getElementById("reveal-title");
 const revealSubtitle = document.getElementById("reveal-subtitle");
 const revealScoreValue = document.getElementById("reveal-score-value");
 const revealBreakdown = document.getElementById("reveal-breakdown");
-const revealGallery = document.getElementById("reveal-gallery");
-const revealGalleryNote = document.getElementById("reveal-gallery-note");
-const revealAttractions = document.getElementById("reveal-attractions");
+const revealTier = document.getElementById("reveal-tier");
 const scoreSection = document.querySelector(".score-section");
 const formFields = {
   id: null,
@@ -182,10 +184,9 @@ const formFields = {
   days: document.getElementById("country-days"),
   budget: document.getElementById("country-budget"),
   notes: document.getElementById("country-notes"),
+  flag: document.getElementById("country-flag"),
   preNotes: document.getElementById("country-pre-notes"),
   postNotes: document.getElementById("country-post-notes"),
-  attractions: document.getElementById("country-attractions"),
-  images: document.getElementById("country-images"),
   scores: {
     wonder: document.getElementById("score-wonder"),
     things: document.getElementById("score-things"),
@@ -205,6 +206,11 @@ let dialogProfileDrafts = {
 
 function normalizeName(value) {
   return value.trim().toLowerCase();
+}
+
+function findCountryByName(name) {
+  const normalized = normalizeName(name);
+  return countries.find((country) => normalizeName(country.name) === normalized);
 }
 
 function normalizeCountry(country) {
@@ -251,8 +257,7 @@ function normalizeCountry(country) {
     ...country,
     profiles: normalizedProfiles,
     scoreAverage: Number.isFinite(normalizedTotal) ? normalizedTotal : null,
-    attractions: Array.isArray(country?.attractions) ? country.attractions : [],
-    images: Array.isArray(country?.images) ? country.images : [],
+    flagUrl: country?.flagUrl || "",
   };
 }
 
@@ -332,7 +337,17 @@ function renderTierList() {
       }
       const pill = document.createElement("div");
       pill.className = "tier-pill";
-      pill.textContent = country.name;
+      if (country.flagUrl) {
+        const flag = document.createElement("img");
+        flag.className = "tier-flag";
+        flag.src = country.flagUrl;
+        flag.alt = `${country.name} flag`;
+        pill.appendChild(flag);
+      }
+      const name = document.createElement("span");
+      name.className = "tier-name";
+      name.textContent = country.name;
+      pill.appendChild(name);
       if (Number.isFinite(country.scoreAverage)) {
         const scoreBadge = document.createElement("strong");
         scoreBadge.className = "score-badge";
@@ -461,12 +476,14 @@ function openDialog(country = null) {
     formFields.bestTime.value = country.bestTime || "";
     formFields.days.value = country.days || "";
     formFields.budget.value = country.budget || "";
-    formFields.attractions.value = (country.attractions || []).join(", ");
-    formFields.images.value = (country.images || []).join(", ");
+    formFields.flag.value = country.flagUrl || "";
     dialogProfileDrafts = cloneProfiles(country.profiles);
     activeProfile = "mike";
     setActiveProfile(activeProfile, true);
     deleteButton.style.display = "inline-flex";
+    if (resetButton) {
+      resetButton.style.display = "inline-flex";
+    }
   } else {
     dialogTitle.textContent = "Add Country";
     activeId = null;
@@ -476,8 +493,7 @@ function openDialog(country = null) {
       randomCountryButton.disabled = false;
     }
     formFields.tier.value = "unranked";
-    formFields.attractions.value = "";
-    formFields.images.value = "";
+    formFields.flag.value = "";
     dialogProfileDrafts = {
       mike: createEmptyProfile(),
       jen: createEmptyProfile(),
@@ -485,6 +501,9 @@ function openDialog(country = null) {
     activeProfile = "mike";
     setActiveProfile(activeProfile, true);
     deleteButton.style.display = "none";
+    if (resetButton) {
+      resetButton.style.display = "none";
+    }
   }
 
   renderCountryOptions();
@@ -526,6 +545,14 @@ function deleteCountry() {
 form.addEventListener("submit", (event) => {
   event.preventDefault();
   storeActiveProfileDraft();
+  if (countryInput && !isCountryValid(countryInput.value)) {
+    countryInput.setCustomValidity("Choose a country from the list.");
+    countryInput.reportValidity();
+    return;
+  }
+  if (countryInput) {
+    countryInput.setCustomValidity("");
+  }
   const averageScore = computeAverageScore(dialogProfileDrafts);
   const scoreTier = getScoreTier(averageScore);
   const data = {
@@ -537,8 +564,7 @@ form.addEventListener("submit", (event) => {
     budget: formFields.budget.value.trim(),
     profiles: cloneProfiles(dialogProfileDrafts),
     scoreAverage: Number.isFinite(averageScore) ? averageScore : null,
-    attractions: parseList(formFields.attractions.value),
-    images: parseList(formFields.images.value),
+    flagUrl: formFields.flag.value.trim(),
   };
 
   if (autoTierToggle && autoTierToggle.checked && scoreTier !== "unranked") {
@@ -564,6 +590,34 @@ form.addEventListener("submit", (event) => {
 });
 
 deleteButton.addEventListener("click", deleteCountry);
+if (resetButton) {
+  resetButton.addEventListener("click", () => {
+    if (!activeId) {
+      return;
+    }
+    const updated = countries.map((country) => {
+      if (country.id !== activeId) {
+        return country;
+      }
+      return {
+        ...country,
+        tier: "unranked",
+        scoreAverage: null,
+        profiles: {
+          mike: createEmptyProfile(),
+          jen: createEmptyProfile(),
+        },
+      };
+    });
+    countries = updated;
+    saveCountries();
+    render();
+    const refreshed = countries.find((country) => country.id === activeId);
+    if (refreshed) {
+      openDialog(refreshed);
+    }
+  });
+}
 openAddButton.addEventListener("click", () => openDialog());
 closeDialogButton.addEventListener("click", closeDialog);
 
@@ -581,6 +635,40 @@ Object.values(formFields.scores).forEach((input) => {
 
 if (autoTierToggle) {
   autoTierToggle.addEventListener("input", updateScorePreview);
+}
+
+if (countryInput) {
+  countryInput.addEventListener("input", () => {
+    countryInput.setCustomValidity("");
+  });
+  countryInput.addEventListener("change", () => {
+    const value = countryInput.value.trim();
+    if (!value) {
+      return;
+    }
+    const existing = findCountryByName(value);
+    if (existing && (!activeId || existing.id !== activeId)) {
+      openDialog(existing);
+    }
+  });
+}
+
+if (toggleTierViewButton) {
+  toggleTierViewButton.addEventListener("click", () => {
+    const isTierOnly = document.body.classList.toggle("tier-only");
+    toggleTierViewButton.textContent = isTierOnly
+      ? "Exit tier-only"
+      : "Tier-only view";
+  });
+}
+
+if (exitTierViewButton) {
+  exitTierViewButton.addEventListener("click", () => {
+    document.body.classList.remove("tier-only");
+    if (toggleTierViewButton) {
+      toggleTierViewButton.textContent = "Tier-only view";
+    }
+  });
 }
 
 profileRadios.forEach((radio) => {
@@ -627,33 +715,19 @@ function getRemainingCountries() {
 }
 
 function renderCountryOptions() {
-  if (!countrySelect) {
+  if (!countryOptions) {
     return;
   }
-  countrySelect.innerHTML = "";
+  countryOptions.innerHTML = "";
   const available = getAvailableCountryOptions();
-  const placeholder = document.createElement("option");
-  placeholder.value = "";
-  placeholder.textContent = "Select a country";
-  placeholder.disabled = true;
-  placeholder.selected = !activeId;
-  countrySelect.appendChild(placeholder);
-
   available
     .slice()
     .sort((a, b) => a.localeCompare(b))
     .forEach((country) => {
       const option = document.createElement("option");
       option.value = country;
-      option.textContent = country;
-      if (activeId && countrySelect.value === country) {
-        option.selected = true;
-      }
-      countrySelect.appendChild(option);
+      countryOptions.appendChild(option);
     });
-  if (activeId) {
-    countrySelect.value = countries.find((c) => c.id === activeId)?.name || "";
-  }
   updateAvailabilityHint();
 }
 
@@ -677,14 +751,19 @@ function getAvailableCountryOptions() {
   if (!COUNTRY_SOURCE.length) {
     return countries.map((country) => country.name);
   }
-  if (!activeId) {
-    return getRemainingCountries();
+  return COUNTRY_SOURCE;
+}
+
+function isCountryValid(value) {
+  const name = value.trim();
+  if (!name) {
+    return false;
   }
-  const currentName = countries.find((country) => country.id === activeId)?.name;
-  const remaining = getRemainingCountries().filter(
-    (name) => normalizeName(name) !== normalizeName(currentName || "")
-  );
-  return currentName ? [currentName, ...remaining] : remaining;
+  if (!COUNTRY_SOURCE.length) {
+    return true;
+  }
+  const normalized = normalizeName(name);
+  return COUNTRY_SOURCE.some((country) => normalizeName(country) === normalized);
 }
 
 function formatScoreValue(value) {
@@ -703,16 +782,6 @@ function computeAverageScore(profiles) {
   }
   const sum = totals.reduce((acc, value) => acc + value, 0);
   return sum / totals.length;
-}
-
-function parseList(value) {
-  if (!value) {
-    return [];
-  }
-  return value
-    .split(/[\n,]+/)
-    .map((item) => item.trim())
-    .filter(Boolean);
 }
 
 function cloneProfiles(profiles) {
@@ -796,8 +865,6 @@ function buildDialogPreview() {
     name: formFields.name.value.trim() || "Score reveal",
     profiles,
     scoreAverage: Number.isFinite(average) ? average : null,
-    attractions: parseList(formFields.attractions.value),
-    images: parseList(formFields.images.value),
   };
 }
 
@@ -809,6 +876,7 @@ function openRevealDialog() {
   const scoreSummary = buildScoreSummary(preview);
   const mikeBreakdown = buildProfileBreakdown(preview.profiles.mike);
   const jenBreakdown = buildProfileBreakdown(preview.profiles.jen);
+  const tier = getScoreTier(preview.scoreAverage);
 
   if (revealTitle) {
     revealTitle.textContent = preview.name || "Score reveal";
@@ -818,6 +886,10 @@ function openRevealDialog() {
   }
   if (revealScoreValue) {
     revealScoreValue.textContent = scoreSummary.totalText;
+  }
+  if (revealTier) {
+    revealTier.textContent = tier === "unranked" ? "-" : tier;
+    revealTier.dataset.tier = tier;
   }
   if (revealBreakdown) {
     const breakdownParts = [];
@@ -829,44 +901,6 @@ function openRevealDialog() {
     }
     revealBreakdown.textContent =
       breakdownParts.join(" | ") || scoreSummary.breakdownText;
-  }
-
-  if (revealGallery) {
-    revealGallery.innerHTML = "";
-    if (preview.images.length) {
-      preview.images.slice(0, 6).forEach((url) => {
-        const img = document.createElement("img");
-        img.src = url;
-        img.alt = preview.name;
-        revealGallery.appendChild(img);
-      });
-      if (revealGalleryNote) {
-        revealGalleryNote.textContent = "";
-      }
-    } else {
-      const placeholder = document.createElement("div");
-      placeholder.className = "reveal-placeholder";
-      placeholder.textContent = "Add image URLs in the form to populate this gallery.";
-      revealGallery.appendChild(placeholder);
-      if (revealGalleryNote) {
-        revealGalleryNote.textContent = "";
-      }
-    }
-  }
-
-  if (revealAttractions) {
-    revealAttractions.innerHTML = "";
-    if (preview.attractions.length) {
-      preview.attractions.forEach((item) => {
-        const li = document.createElement("li");
-        li.textContent = item;
-        revealAttractions.appendChild(li);
-      });
-    } else {
-      const li = document.createElement("li");
-      li.textContent = "Add top attractions in the form to show them here.";
-      revealAttractions.appendChild(li);
-    }
   }
 
   revealDialog.showModal();
