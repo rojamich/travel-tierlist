@@ -241,6 +241,9 @@ function findCountryByName(name) {
 }
 
 function normalizeCountry(country) {
+  if (!country || !country.name) {
+    return null;
+  }
   const hasProfiles = country && typeof country.profiles === "object";
   const baseProfiles = hasProfiles
     ? country.profiles
@@ -289,6 +292,12 @@ function normalizeCountry(country) {
   const normalizedTotal = computeAverageScore(normalizedProfiles);
   return {
     ...country,
+    name: country.name,
+    status: country.status || "not-visited",
+    tier: country.tier || "unranked",
+    bestTime: country.bestTime || "",
+    days: country.days || "",
+    budget: country.budget || "",
     profiles: normalizedProfiles,
     scoreAverage: Number.isFinite(normalizedTotal) ? normalizedTotal : null,
     flagUrl: country?.flagUrl || "",
@@ -1136,9 +1145,9 @@ function subscribeToCountries() {
       maybeMigrateLocalToFirestore();
       return;
     }
-    const remoteCountries = snapshot.docs.map((doc) =>
-      normalizeCountry({ id: doc.id, ...doc.data() })
-    );
+    const remoteCountries = snapshot.docs
+      .map((doc) => normalizeCountry({ id: doc.id, ...doc.data() }))
+      .filter(Boolean);
     countries = mergeRemoteCountries(remoteCountries, countries);
     suppressLocalSave = true;
     saveCountriesLocal();
