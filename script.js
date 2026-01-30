@@ -154,6 +154,7 @@ const randomCountryButton = document.getElementById("random-country");
 
 const statusFilter = document.getElementById("status-filter");
 const tierFilter = document.getElementById("tier-filter");
+const profileFilter = document.getElementById("profile-filter");
 const searchInput = document.getElementById("search-input");
 
 const countryCards = document.getElementById("country-cards");
@@ -186,6 +187,7 @@ const revealScoreValue = document.getElementById("reveal-score-value");
 const revealBreakdown = document.getElementById("reveal-breakdown");
 const revealTier = document.getElementById("reveal-tier");
 const scoreSection = document.querySelector(".score-section");
+const profileStatus = document.getElementById("profile-status");
 const formFields = {
   id: null,
   name: document.getElementById("country-name"),
@@ -266,6 +268,7 @@ function normalizeCountry(country) {
       notes: profile?.notes || "",
       preNotes: profile?.preNotes || "",
       postNotes: profile?.postNotes || "",
+      updatedAt: profile?.updatedAt || null,
     };
     return acc;
   }, {});
@@ -309,6 +312,7 @@ function saveCountries() {
 function matchesFilters(country) {
   const statusValue = statusFilter.value;
   const tierValue = tierFilter.value;
+  const profileValue = profileFilter ? profileFilter.value : "all";
   const query = searchInput.value.trim().toLowerCase();
 
   if (statusValue !== "all" && country.status !== statusValue) {
@@ -317,6 +321,20 @@ function matchesFilters(country) {
 
   if (tierValue !== "all" && country.tier !== tierValue) {
     return false;
+  }
+
+  if (profileValue !== "all") {
+    const mikeScored = Number.isFinite(country.profiles?.mike?.scoreTotal);
+    const jenScored = Number.isFinite(country.profiles?.jen?.scoreTotal);
+    if (profileValue === "mike-missing" && mikeScored) {
+      return false;
+    }
+    if (profileValue === "jen-missing" && jenScored) {
+      return false;
+    }
+    if (profileValue === "both-scored" && !(mikeScored && jenScored)) {
+      return false;
+    }
   }
 
   if (query) {
@@ -538,6 +556,7 @@ function openDialog(country = null) {
   renderCountryOptions();
   updateAvailabilityHint();
   updateScorePreview();
+  updateProfileStatus();
   if (scoreSection) {
     scoreSection.classList.remove("revealed");
   }
@@ -583,7 +602,9 @@ form.addEventListener("submit", (event) => {
   if (countryInput) {
     countryInput.setCustomValidity("");
   }
-  const averageScore = computeAverageScore(dialogProfileDrafts);
+  const existing = activeId ? countries.find((country) => country.id === activeId) : null;
+  const mergedProfiles = mergeProfiles(existing?.profiles, dialogProfileDrafts, activeProfile);
+  const averageScore = computeAverageScore(mergedProfiles);
   const scoreTier = getScoreTier(averageScore);
   const data = {
     name: formFields.name.value.trim(),
@@ -592,7 +613,7 @@ form.addEventListener("submit", (event) => {
     bestTime: formFields.bestTime.value.trim(),
     days: formFields.days.value.trim(),
     budget: formFields.budget.value.trim(),
-    profiles: cloneProfiles(dialogProfileDrafts),
+    profiles: cloneProfiles(mergedProfiles),
     scoreAverage: Number.isFinite(averageScore) ? averageScore : null,
     flagUrl: formFields.flag.value.trim(),
   };
@@ -617,7 +638,6 @@ form.addEventListener("submit", (event) => {
 
   const isNew = !activeId;
   profileDirty[activeProfile] = true;
-  generalDirty = true;
   upsertCountry(data);
   syncCountry(data, { isNew });
   closeDialog();
@@ -658,7 +678,7 @@ if (resetButton) {
 openAddButton.addEventListener("click", () => openDialog());
 closeDialogButton.addEventListener("click", closeDialog);
 
-[statusFilter, tierFilter, searchInput].forEach((input) => {
+[statusFilter, tierFilter, profileFilter, searchInput].forEach((input) => {
   input.addEventListener("input", render);
 });
 
@@ -875,6 +895,20 @@ function cloneProfiles(profiles) {
   }, {});
 }
 
+function mergeProfiles(existingProfiles, draftProfiles, activeKey) {
+  const merged = cloneProfiles(existingProfiles || {});
+  const draft = draftProfiles?.[activeKey] ?? createEmptyProfile();
+  merged[activeKey] = {
+    scores: draft.scores ? { ...draft.scores } : null,
+    scoreTotal: Number.isFinite(draft.scoreTotal) ? draft.scoreTotal : null,
+    notes: draft.notes || "",
+    preNotes: draft.preNotes || "",
+    postNotes: draft.postNotes || "",
+    updatedAt: new Date().toISOString(),
+  };
+  return merged;
+}
+
 function buildProfileFromForm() {
   const scores = readScoreInputs();
   const scoreTotal = computeScoreTotal(scores);
@@ -884,6 +918,7 @@ function buildProfileFromForm() {
     notes: formFields.notes.value.trim(),
     preNotes: formFields.preNotes.value.trim(),
     postNotes: formFields.postNotes.value.trim(),
+    updatedAt: dialogProfileDrafts[activeProfile]?.updatedAt || null,
   };
 }
 
@@ -911,6 +946,7 @@ function setActiveProfile(profile, force = false) {
   formFields.postNotes.value = profileData.postNotes || "";
   setScoreInputs(profileData.scores || {});
   updateScorePreview();
+  updateProfileStatus();
 }
 
 function combineProfileText(country, field) {
@@ -932,6 +968,35 @@ function buildProfileBreakdown(profile) {
   return scoreFields
     .map(({ key, label }) => `${label} ${profile.scores[key] ?? "-"}`)
     .join(", ");
+}
+
+function updateProfileStatus() {
+  if (!profileStatus) {
+    return;
+  }
+  const mikeStamp = formatTimestamp(dialogProfileDrafts.mike?.updatedAt);
+  const jenStamp = formatTimestamp(dialogProfileDrafts.jen?.updatedAt);
+  profileStatus.textContent = `Last saved - Mike: ${mikeStamp} | Jen: ${jenStamp}`;
+}
+
+function formatTimestamp(value) {
+  if (!value) {
+    return "Never";
+  }
+  if (typeof value === "string") {
+    const date = new Date(value);
+    if (!Number.isNaN(date.getTime())) {
+      return date.toLocaleString();
+    }
+  }
+  if (value && typeof value.toDate === "function") {
+    return value.toDate().toLocaleString();
+  }
+  if (value && typeof value.seconds === "number") {
+    const date = new Date(value.seconds * 1000);
+    return date.toLocaleString();
+  }
+  return "Unknown";
 }
 
 function initFirebase() {
@@ -1065,6 +1130,11 @@ function syncCountry(country, { isNew, forceProfiles = false } = {}) {
   }
 
   docRef.set(stripUndefined(payload), { merge: true }).then(() => {
+    dialogProfileDrafts[activeProfile] = {
+      ...dialogProfileDrafts[activeProfile],
+      updatedAt: new Date().toISOString(),
+    };
+    updateProfileStatus();
     profileDirty = { mike: false, jen: false };
     generalDirty = false;
   });

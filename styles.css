@@ -572,6 +572,12 @@ dialog::backdrop {
   font-size: 0.85rem;
 }
 
+.profile-status {
+  margin-left: auto;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
 .score-section {
   background: #fff;
   border: 1px solid var(--border);
