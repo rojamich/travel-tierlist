@@ -2,6 +2,15 @@ const STORAGE_KEY = "travelTierListData";
 const MIGRATION_KEY = "travelTierListMigrated";
 const PEXELS_KEY_STORAGE = "pexelsApiKey";
 const PEXELS_RESULTS = 5;
+const PEXELS_QUERY_STORAGE = "pexelsQueryIndex";
+const PEXELS_QUERY_STYLES = [
+  "top sights and attractions of {country}",
+  "{country} landmarks",
+  "{country} travel photography",
+  "{country} cityscape",
+  "{country} nature",
+  "{country} historic sites",
+];
 const COUNTRY_SOURCE = Array.isArray(window.ALL_COUNTRIES)
   ? window.ALL_COUNTRIES
   : [];
@@ -299,6 +308,18 @@ function normalizeCountry(country) {
 
   const normalizedTotal = computeAverageScore(normalizedProfiles);
   const rawAverage = Number(country?.scoreAverage);
+  const normalizedImages = Array.isArray(country?.images)
+    ? country.images
+        .map((image) => ({
+          src: image?.src || "",
+          alt: image?.alt || "",
+          photographer: image?.photographer || "",
+          url: image?.url || "",
+          locked: Boolean(image?.locked),
+        }))
+        .filter((image) => image.src)
+    : [];
+
   return {
     ...country,
     name: country.name,
@@ -314,7 +335,7 @@ function normalizeCountry(country) {
         ? rawAverage
         : null,
     flagUrl: country?.flagUrl || "",
-    images: Array.isArray(country?.images) ? country.images : [],
+    images: normalizedImages,
     attractions: Array.isArray(country?.attractions) ? country.attractions : [],
   };
 }
@@ -614,10 +635,12 @@ function renderGallery(images) {
     galleryStatus.textContent = "No photos yet. Click regenerate to fetch five.";
     return;
   }
-  galleryStatus.textContent = `Showing ${images.length} photos.`;
-  images.forEach((image) => {
+  galleryStatus.textContent =
+    "Click a photo to lock/unlock it. Locked photos are kept on regenerate.";
+  images.forEach((image, index) => {
     const figure = document.createElement("figure");
-    figure.className = "gallery-card";
+    figure.className = `gallery-card${image.locked ? " locked" : ""}`;
+    figure.dataset.index = String(index);
     const img = document.createElement("img");
     img.src = image.src;
     img.alt = image.alt || "Travel photo";
@@ -637,6 +660,13 @@ function renderGallery(images) {
     }
     figure.appendChild(img);
     figure.appendChild(caption);
+    figure.addEventListener("click", (event) => {
+      if (event.target.closest("a")) {
+        return;
+      }
+      event.preventDefault();
+      toggleGalleryLock(index);
+    });
     galleryContainer.appendChild(figure);
   });
 }
@@ -910,11 +940,19 @@ if (regeneratePhotosButton) {
       galleryStatus.textContent = "Fetching photos from Pexels...";
     }
     const countryName = formFields.name.value.trim();
-    fetchPexelsPhotos(countryName).then((photos) => {
+    const targetId = activeId || normalizeName(countryName).replace(/\s+/g, "-");
+    const query = getNextPexelsQuery(targetId, countryName);
+    fetchPexelsPhotos(query).then((photos) => {
       const targetId = activeId || normalizeName(countryName).replace(/\s+/g, "-");
       const existing = countries.find((country) => country.id === targetId);
+      const lockedImages = existing?.images?.filter((image) => image.locked) || [];
+      const remainingSlots = Math.max(PEXELS_RESULTS - lockedImages.length, 0);
+      const replacements = photos.filter(
+        (photo) => !lockedImages.some((locked) => locked.src === photo.src)
+      );
+      const mergedImages = lockedImages.concat(replacements.slice(0, remainingSlots));
       if (existing) {
-        existing.images = photos;
+        existing.images = mergedImages;
         saveCountries();
         syncCountry(existing, { isNew: false, forceProfiles: false });
       } else {
@@ -929,7 +967,7 @@ if (regeneratePhotosButton) {
           profiles: cloneProfiles(dialogProfileDrafts),
           scoreAverage: null,
           flagUrl: formFields.flag.value.trim(),
-          images: photos,
+          images: mergedImages,
           attractions: [],
         });
         saveCountries();
@@ -938,10 +976,12 @@ if (regeneratePhotosButton) {
           syncCountry(fresh, { isNew: true, forceProfiles: true });
         }
       }
-      renderGallery(photos);
+      renderGallery(mergedImages);
       render();
       if (!photos.length && galleryStatus) {
         galleryStatus.textContent = "No results found. Try another country name.";
+      } else if (galleryStatus) {
+        galleryStatus.textContent = `Search style: "${query}". Click a photo to lock it.`;
       }
     }).finally(() => {
       regeneratePhotosButton.disabled = false;
@@ -1222,17 +1262,24 @@ function ensurePexelsApiKey() {
   return apiKey.trim();
 }
 
-function buildPexelsQuery(countryName) {
-  return `top sights and attractions of ${countryName}`;
+function getNextPexelsQuery(countryId, countryName) {
+  const storageKey = `${PEXELS_QUERY_STORAGE}:${countryId}`;
+  const currentIndex = Number(localStorage.getItem(storageKey));
+  const nextIndex = Number.isFinite(currentIndex)
+    ? (currentIndex + 1) % PEXELS_QUERY_STYLES.length
+    : 0;
+  localStorage.setItem(storageKey, String(nextIndex));
+  const template = PEXELS_QUERY_STYLES[nextIndex] || "{country}";
+  return template.replace("{country}", countryName);
 }
 
-function fetchPexelsPhotos(countryName) {
+function fetchPexelsPhotos(query) {
   const apiKey = ensurePexelsApiKey();
   if (!apiKey) {
     return Promise.resolve([]);
   }
-  const query = encodeURIComponent(buildPexelsQuery(countryName));
-  const url = `https://api.pexels.com/v1/search?query=${query}&per_page=${PEXELS_RESULTS}&orientation=landscape`;
+  const encoded = encodeURIComponent(query);
+  const url = `https://api.pexels.com/v1/search?query=${encoded}&per_page=${PEXELS_RESULTS}&orientation=landscape`;
   return fetch(url, {
     headers: {
       Authorization: apiKey,
@@ -1250,9 +1297,10 @@ function fetchPexelsPhotos(countryName) {
       }
       return data.photos.slice(0, PEXELS_RESULTS).map((photo) => ({
         src: photo?.src?.landscape || photo?.src?.medium || photo?.src?.large || "",
-        alt: photo?.alt || `${countryName} attraction`,
+        alt: photo?.alt || "Travel attraction",
         photographer: photo?.photographer || "Pexels",
         url: photo?.url || "",
+        locked: false,
       })).filter((photo) => photo.src);
     })
     .catch((error) => {
@@ -1261,6 +1309,29 @@ function fetchPexelsPhotos(countryName) {
       }
       return [];
     });
+}
+
+function toggleGalleryLock(index) {
+  if (!Number.isInteger(index)) {
+    return;
+  }
+  const name = formFields.name.value.trim();
+  if (!name) {
+    return;
+  }
+  const targetId = activeId || normalizeName(name).replace(/\s+/g, "-");
+  const existing = countries.find((country) => country.id === targetId);
+  if (!existing || !Array.isArray(existing.images)) {
+    return;
+  }
+  const image = existing.images[index];
+  if (!image) {
+    return;
+  }
+  image.locked = !image.locked;
+  saveCountries();
+  syncCountry(existing, { isNew: false, forceProfiles: false });
+  renderGallery(existing.images);
 }
 
 function formatTimestamp(value) {

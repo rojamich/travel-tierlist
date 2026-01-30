@@ -699,6 +699,8 @@ dialog::backdrop {
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
+  cursor: pointer;
+  position: relative;
 }
 
 .gallery-card img {
@@ -718,6 +720,25 @@ dialog::backdrop {
   color: inherit;
   text-decoration: none;
   font-weight: 600;
+}
+
+.gallery-card.locked {
+  border-color: var(--accent);
+  box-shadow: 0 10px 20px rgba(15, 76, 92, 0.18);
+}
+
+.gallery-card.locked::after {
+  content: "Locked";
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.65rem;
+  padding: 0.15rem 0.4rem;
+  border-radius: 999px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .score-header {
