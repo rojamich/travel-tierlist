@@ -1126,10 +1126,17 @@ function mergeProfiles(existingProfiles, draftProfiles, activeKey) {
 
 function buildProfileFromForm() {
   const scores = readScoreInputs();
+  const hasAnyScore = Object.values(scores).some((value) => Number.isFinite(value));
   const scoreTotal = computeScoreTotal(scores);
+  const fallbackTotal = dialogProfileDrafts[activeProfile]?.scoreTotal;
+  const normalizedTotal = Number.isFinite(scoreTotal)
+    ? scoreTotal
+    : !hasAnyScore && Number.isFinite(fallbackTotal)
+      ? fallbackTotal
+      : null;
   return {
-    scores,
-    scoreTotal: Number.isFinite(scoreTotal) ? scoreTotal : null,
+    scores: hasAnyScore ? scores : null,
+    scoreTotal: normalizedTotal,
     notes: formFields.notes.value.trim(),
     preNotes: formFields.preNotes.value.trim(),
     postNotes: formFields.postNotes.value.trim(),
@@ -1666,12 +1673,22 @@ function mergeRemoteCountries(remoteCountries, localCountries) {
       const remoteStamp = getTimestampValue(remoteProfile.updatedAt);
       const localHasScore = Number.isFinite(localProfile.scoreTotal);
       const remoteHasScore = Number.isFinite(remoteProfile.scoreTotal);
-      if (localHasScore && !remoteHasScore) {
-        acc[key] = localProfile;
-      } else if (remoteHasScore && !localHasScore) {
+      const localHasNotes = Boolean(
+        localProfile.notes || localProfile.preNotes || localProfile.postNotes
+      );
+      const remoteHasNotes = Boolean(
+        remoteProfile.notes || remoteProfile.preNotes || remoteProfile.postNotes
+      );
+      const localHasData = localHasScore || localHasNotes;
+      const remoteHasData = remoteHasScore || remoteHasNotes;
+      if (remoteHasData && !localHasData) {
         acc[key] = remoteProfile;
+      } else if (localHasData && !remoteHasData) {
+        acc[key] = localProfile;
+      } else if (remoteHasData && localHasData) {
+        acc[key] = remoteStamp >= localStamp ? remoteProfile : localProfile;
       } else {
-        acc[key] = localStamp > remoteStamp ? localProfile : remoteProfile;
+        acc[key] = remoteProfile;
       }
       return acc;
     }, {});
@@ -1680,6 +1697,11 @@ function mergeRemoteCountries(remoteCountries, localCountries) {
       ...remote,
       profiles: mergedProfiles,
       scoreAverage: Number.isFinite(average) ? average : remote.scoreAverage,
+      images: (remote.images && remote.images.length) ? remote.images : local.images,
+      attractions: (remote.attractions && remote.attractions.length)
+        ? remote.attractions
+        : local.attractions,
+      flagUrl: remote.flagUrl || local.flagUrl,
     };
   });
 }
