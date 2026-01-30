@@ -1007,24 +1007,24 @@ function updateProfileTracker() {
 }
 
 function getProfileStats() {
-  const source = COUNTRY_SOURCE.length ? COUNTRY_SOURCE : countries.map((c) => c.name);
   const stats = {
     mike: { scored: 0, missing: [] },
     jen: { scored: 0, missing: [] },
   };
-  source.forEach((name) => {
-    const existing = findCountryByName(name);
-    const mikeScored = Number.isFinite(existing?.profiles?.mike?.scoreTotal);
-    const jenScored = Number.isFinite(existing?.profiles?.jen?.scoreTotal);
+  countries.forEach((country) => {
+    const mikeScored = Number.isFinite(country.profiles?.mike?.scoreTotal);
+    const jenScored = Number.isFinite(country.profiles?.jen?.scoreTotal);
     if (mikeScored) {
       stats.mike.scored += 1;
-    } else {
-      stats.mike.missing.push(name);
     }
     if (jenScored) {
       stats.jen.scored += 1;
-    } else {
-      stats.jen.missing.push(name);
+    }
+    if (jenScored && !mikeScored) {
+      stats.mike.missing.push(country.name);
+    }
+    if (mikeScored && !jenScored) {
+      stats.jen.missing.push(country.name);
     }
   });
   return stats;
