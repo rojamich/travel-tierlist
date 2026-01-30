@@ -581,7 +581,7 @@ function upsertCountry(data) {
       country.id === activeId ? { ...country, ...data } : country
     );
   } else {
-    const id = normalizeName(data.name).replace(/\s+/g, "-");
+    const id = data.id || normalizeName(data.name).replace(/\s+/g, "-");
     countries.push({ id, ...data });
   }
   saveCountries();
@@ -651,9 +651,11 @@ form.addEventListener("submit", (event) => {
   }
 
   const isNew = !activeId;
+  const id = activeId || normalizeName(data.name).replace(/\s+/g, "-");
+  const payload = { id, ...data };
   profileDirty[activeProfile] = true;
-  upsertCountry(data);
-  syncCountry(data, { isNew });
+  upsertCountry(payload);
+  syncCountry(payload, { isNew });
   closeDialog();
 });
 
