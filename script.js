@@ -266,9 +266,15 @@ function normalizeCountry(country) {
           return scoreAcc;
         }, {})
       : null;
-    const normalizedTotal = Number.isFinite(profile?.scoreTotal)
-      ? profile.scoreTotal
-      : computeScoreTotal(normalizedScores);
+    const computedTotal = computeScoreTotal(normalizedScores);
+    let normalizedTotal = Number.isFinite(computedTotal)
+      ? computedTotal
+      : Number.isFinite(profile?.scoreTotal)
+        ? profile.scoreTotal
+        : null;
+    if (!Number.isFinite(normalizedTotal) || normalizedTotal < 5) {
+      normalizedTotal = null;
+    }
     acc[key] = {
       scores: normalizedScores,
       scoreTotal: Number.isFinite(normalizedTotal) ? normalizedTotal : null,
@@ -1129,7 +1135,7 @@ function subscribeToCountries() {
     const remoteCountries = snapshot.docs.map((doc) =>
       normalizeCountry({ id: doc.id, ...doc.data() })
     );
-    countries = remoteCountries;
+    countries = mergeRemoteCountries(remoteCountries, countries);
     suppressLocalSave = true;
     saveCountriesLocal();
     suppressLocalSave = false;
@@ -1243,6 +1249,47 @@ function stripUndefined(payload) {
   return Object.fromEntries(
     Object.entries(payload).filter(([, value]) => value !== undefined)
   );
+}
+
+function mergeRemoteCountries(remoteCountries, localCountries) {
+  const localMap = new Map(localCountries.map((country) => [country.id, country]));
+  return remoteCountries.map((remote) => {
+    const local = localMap.get(remote.id);
+    if (!local) {
+      return remote;
+    }
+    const mergedProfiles = PROFILE_KEYS.reduce((acc, key) => {
+      const localProfile = local.profiles?.[key] ?? createEmptyProfile();
+      const remoteProfile = remote.profiles?.[key] ?? createEmptyProfile();
+      const localStamp = getTimestampValue(localProfile.updatedAt);
+      const remoteStamp = getTimestampValue(remoteProfile.updatedAt);
+      acc[key] = localStamp > remoteStamp ? localProfile : remoteProfile;
+      return acc;
+    }, {});
+    const average = computeAverageScore(mergedProfiles);
+    return {
+      ...remote,
+      profiles: mergedProfiles,
+      scoreAverage: Number.isFinite(average) ? average : remote.scoreAverage,
+    };
+  });
+}
+
+function getTimestampValue(value) {
+  if (!value) {
+    return 0;
+  }
+  if (typeof value === "string") {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? 0 : date.getTime();
+  }
+  if (value && typeof value.toDate === "function") {
+    return value.toDate().getTime();
+  }
+  if (value && typeof value.seconds === "number") {
+    return value.seconds * 1000;
+  }
+  return 0;
 }
 
 function buildDialogPreview() {
