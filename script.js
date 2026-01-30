@@ -1729,13 +1729,31 @@ function getTimestampValue(value) {
   }
   if (typeof value === "string") {
     const date = new Date(value);
-    return Number.isNaN(date.getTime()) ? 0 : date.getTime();
+    if (Number.isNaN(date.getTime())) {
+      return 0;
+    }
+    const timestamp = date.getTime();
+    const now = Date.now();
+    if (timestamp > now + 5 * 60 * 1000) {
+      return 0;
+    }
+    return timestamp;
   }
   if (value && typeof value.toDate === "function") {
-    return value.toDate().getTime();
+    const timestamp = value.toDate().getTime();
+    const now = Date.now();
+    if (timestamp > now + 5 * 60 * 1000) {
+      return 0;
+    }
+    return timestamp;
   }
   if (value && typeof value.seconds === "number") {
-    return value.seconds * 1000;
+    const timestamp = value.seconds * 1000;
+    const now = Date.now();
+    if (timestamp > now + 5 * 60 * 1000) {
+      return 0;
+    }
+    return timestamp;
   }
   return 0;
 }
