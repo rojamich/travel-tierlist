@@ -147,6 +147,7 @@ const deleteButton = document.getElementById("delete-country");
 const resetButton = document.getElementById("reset-country");
 const toggleTierViewButton = document.getElementById("toggle-tier-view");
 const exitTierViewButton = document.getElementById("exit-tier-view");
+const syncNowButton = document.getElementById("sync-now");
 const countryInput = document.getElementById("country-name");
 const countryOptions = document.getElementById("country-options");
 const countryAvailability = document.getElementById("country-availability");
@@ -801,6 +802,10 @@ if (exitTierViewButton) {
   });
 }
 
+if (syncNowButton) {
+  syncNowButton.addEventListener("click", syncAllCountries);
+}
+
 initFirebase();
 
 window.addEventListener("beforeunload", () => {
@@ -1206,7 +1211,7 @@ function maybeMigrateLocalToFirestore() {
 
 function syncCountry(country, { isNew, forceProfiles = false } = {}) {
   if (!firestoreEnabled || !firestoreDb || !country?.id) {
-    return;
+    return Promise.resolve(false);
   }
   const docRef = firestoreDb.collection("countries").doc(country.id);
   const payload = {
@@ -1245,10 +1250,10 @@ function syncCountry(country, { isNew, forceProfiles = false } = {}) {
   Object.assign(payload, profilePayload);
 
   if (!generalDirty && !Object.keys(profilePayload).length && !isNew) {
-    return;
+    return Promise.resolve(false);
   }
 
-  docRef.set(stripUndefined(payload), { merge: true }).then(() => {
+  return docRef.set(stripUndefined(payload), { merge: true }).then(() => {
     dialogProfileDrafts[activeProfile] = {
       ...dialogProfileDrafts[activeProfile],
       updatedAt: new Date().toISOString(),
@@ -1256,6 +1261,48 @@ function syncCountry(country, { isNew, forceProfiles = false } = {}) {
     updateProfileStatus();
     profileDirty = { mike: false, jen: false };
     generalDirty = false;
+    return true;
+  });
+}
+
+function shouldSyncProfile(profile) {
+  if (!profile) {
+    return false;
+  }
+  const hasScores = Number.isFinite(profile.scoreTotal);
+  const hasNotes = Boolean(profile.notes || profile.preNotes || profile.postNotes);
+  return hasScores || hasNotes;
+}
+
+function syncAllCountries() {
+  if (!firestoreEnabled || !firestoreDb) {
+    alert("Sync is only available when Firestore is connected.");
+    return;
+  }
+  if (!syncNowButton) {
+    return;
+  }
+  syncNowButton.disabled = true;
+  const originalLabel = syncNowButton.textContent;
+  syncNowButton.textContent = "Syncing...";
+  const tasks = countries.map((country) => {
+    const profilePayload = PROFILE_KEYS.reduce((acc, key) => {
+      const profile = country.profiles?.[key];
+      if (shouldSyncProfile(profile)) {
+        acc[key] = profile;
+      }
+      return acc;
+    }, {});
+    const payload = {
+      ...country,
+      profiles: profilePayload,
+      scoreAverage: Number.isFinite(country.scoreAverage) ? country.scoreAverage : null,
+    };
+    return syncCountry(payload, { isNew: false, forceProfiles: true });
+  });
+  Promise.allSettled(tasks).finally(() => {
+    syncNowButton.disabled = false;
+    syncNowButton.textContent = originalLabel;
   });
 }
 
