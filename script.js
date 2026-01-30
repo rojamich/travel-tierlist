@@ -1,4 +1,5 @@
 const STORAGE_KEY = "travelTierListData";
+const MIGRATION_KEY = "travelTierListMigrated";
 const COUNTRY_SOURCE = Array.isArray(window.ALL_COUNTRIES)
   ? window.ALL_COUNTRIES
   : [];
@@ -98,6 +99,16 @@ const statusLabel = {
   visited: "Visited",
   planning: "Planning",
   "not-visited": "Not Visited",
+};
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCQ5YPI-2GttDgHV9_4ugVijY0p9l0Yimk",
+  authDomain: "travel-tiers.firebaseapp.com",
+  projectId: "travel-tiers",
+  storageBucket: "travel-tiers.firebasestorage.app",
+  messagingSenderId: "158515437740",
+  appId: "1:158515437740:web:213b3554ba8ad3022f7f09",
+  measurementId: "G-XVPZE895F5",
 };
 
 const scoreFields = [
@@ -203,6 +214,13 @@ let dialogProfileDrafts = {
   mike: createEmptyProfile(),
   jen: createEmptyProfile(),
 };
+let profileDirty = { mike: false, jen: false };
+let generalDirty = false;
+let firestoreEnabled = false;
+let firestoreDb = null;
+let firestoreReady = false;
+let isMigrating = false;
+let suppressLocalSave = false;
 
 function normalizeName(value) {
   return value.trim().toLowerCase();
@@ -277,8 +295,15 @@ function loadCountries() {
   return defaultCountries;
 }
 
-function saveCountries() {
+function saveCountriesLocal() {
+  if (suppressLocalSave) {
+    return;
+  }
   localStorage.setItem(STORAGE_KEY, JSON.stringify(countries));
+}
+
+function saveCountries() {
+  saveCountriesLocal();
 }
 
 function matchesFilters(country) {
@@ -479,6 +504,8 @@ function openDialog(country = null) {
     formFields.flag.value = country.flagUrl || "";
     dialogProfileDrafts = cloneProfiles(country.profiles);
     activeProfile = "mike";
+    profileDirty = { mike: false, jen: false };
+    generalDirty = false;
     setActiveProfile(activeProfile, true);
     deleteButton.style.display = "inline-flex";
     if (resetButton) {
@@ -499,6 +526,8 @@ function openDialog(country = null) {
       jen: createEmptyProfile(),
     };
     activeProfile = "mike";
+    profileDirty = { mike: false, jen: false };
+    generalDirty = false;
     setActiveProfile(activeProfile, true);
     deleteButton.style.display = "none";
     if (resetButton) {
@@ -538,6 +567,7 @@ function deleteCountry() {
   }
   countries = countries.filter((country) => country.id !== activeId);
   saveCountries();
+  deleteCountryRemote(activeId);
   render();
   closeDialog();
 }
@@ -585,7 +615,9 @@ form.addEventListener("submit", (event) => {
     return;
   }
 
+  const isNew = !activeId;
   upsertCountry(data);
+  syncCountry(data, { isNew });
   closeDialog();
 });
 
@@ -611,8 +643,11 @@ if (resetButton) {
     });
     countries = updated;
     saveCountries();
-    render();
     const refreshed = countries.find((country) => country.id === activeId);
+    if (refreshed) {
+      syncCountry(refreshed, { isNew: false, forceProfiles: true });
+    }
+    render();
     if (refreshed) {
       openDialog(refreshed);
     }
@@ -653,6 +688,40 @@ if (countryInput) {
   });
 }
 
+const profileInputs = [
+  formFields.notes,
+  formFields.preNotes,
+  formFields.postNotes,
+  ...Object.values(formFields.scores),
+];
+
+profileInputs.forEach((input) => {
+  if (!input) {
+    return;
+  }
+  input.addEventListener("input", () => {
+    profileDirty[activeProfile] = true;
+  });
+});
+
+const generalInputs = [
+  formFields.status,
+  formFields.tier,
+  formFields.bestTime,
+  formFields.days,
+  formFields.budget,
+  formFields.flag,
+];
+
+generalInputs.forEach((input) => {
+  if (!input) {
+    return;
+  }
+  input.addEventListener("input", () => {
+    generalDirty = true;
+  });
+});
+
 if (toggleTierViewButton) {
   toggleTierViewButton.addEventListener("click", () => {
     const isTierOnly = document.body.classList.toggle("tier-only");
@@ -670,6 +739,8 @@ if (exitTierViewButton) {
     }
   });
 }
+
+initFirebase();
 
 profileRadios.forEach((radio) => {
   radio.addEventListener("input", (event) => {
@@ -855,6 +926,155 @@ function buildProfileBreakdown(profile) {
   return scoreFields
     .map(({ key, label }) => `${label} ${profile.scores[key] ?? "-"}`)
     .join(", ");
+}
+
+function initFirebase() {
+  if (!window.firebase || !firebaseConfig?.apiKey) {
+    return;
+  }
+  if (firebase.apps?.length) {
+    firestoreDb = firebase.firestore();
+    firestoreEnabled = true;
+  } else {
+    firebase.initializeApp(firebaseConfig);
+    firestoreDb = firebase.firestore();
+    firestoreEnabled = true;
+  }
+
+  if (!firestoreDb) {
+    return;
+  }
+
+  firestoreEnabled = true;
+  subscribeToCountries();
+}
+
+function subscribeToCountries() {
+  if (!firestoreEnabled || !firestoreDb) {
+    return;
+  }
+  firestoreDb.collection("countries").onSnapshot((snapshot) => {
+    if (!firestoreReady) {
+      firestoreReady = true;
+    }
+    if (snapshot.empty) {
+      maybeMigrateLocalToFirestore();
+      return;
+    }
+    const remoteCountries = snapshot.docs.map((doc) =>
+      normalizeCountry({ id: doc.id, ...doc.data() })
+    );
+    countries = remoteCountries;
+    suppressLocalSave = true;
+    saveCountriesLocal();
+    suppressLocalSave = false;
+    render();
+  });
+}
+
+function maybeMigrateLocalToFirestore() {
+  if (isMigrating || !firestoreEnabled || !firestoreDb) {
+    return;
+  }
+  const hasMigrated = localStorage.getItem(MIGRATION_KEY) === "true";
+  const saved = localStorage.getItem(STORAGE_KEY);
+  if (hasMigrated || !saved) {
+    return;
+  }
+  let parsed = [];
+  try {
+    parsed = JSON.parse(saved);
+  } catch (error) {
+    return;
+  }
+  if (!Array.isArray(parsed) || !parsed.length) {
+    return;
+  }
+  isMigrating = true;
+  const batch = firestoreDb.batch();
+  parsed.forEach((country) => {
+    const normalized = normalizeCountry(country);
+    const docRef = firestoreDb.collection("countries").doc(normalized.id);
+    batch.set(docRef, stripUndefined({
+      name: normalized.name,
+      status: normalized.status,
+      tier: normalized.tier,
+      bestTime: normalized.bestTime,
+      days: normalized.days,
+      budget: normalized.budget,
+      profiles: normalized.profiles,
+      scoreAverage: normalized.scoreAverage,
+      flagUrl: normalized.flagUrl,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    }), { merge: true });
+  });
+  batch.commit().then(() => {
+    localStorage.setItem(MIGRATION_KEY, "true");
+    isMigrating = false;
+  }).catch(() => {
+    isMigrating = false;
+  });
+}
+
+function syncCountry(country, { isNew, forceProfiles = false } = {}) {
+  if (!firestoreEnabled || !firestoreDb || !country?.id) {
+    return;
+  }
+  const docRef = firestoreDb.collection("countries").doc(country.id);
+  const payload = {
+    name: country.name,
+    status: country.status,
+    tier: country.tier,
+    bestTime: country.bestTime,
+    days: country.days,
+    budget: country.budget,
+    scoreAverage: country.scoreAverage,
+    flagUrl: country.flagUrl,
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+  };
+
+  const profilePayload = {};
+  const includeAllProfiles = isNew || forceProfiles;
+  PROFILE_KEYS.forEach((key) => {
+    if (!includeAllProfiles && !profileDirty[key]) {
+      return;
+    }
+    const profile = country.profiles?.[key] ?? createEmptyProfile();
+    profilePayload[key] = {
+      scores: profile.scores,
+      scoreTotal: profile.scoreTotal,
+      notes: profile.notes,
+      preNotes: profile.preNotes,
+      postNotes: profile.postNotes,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    };
+  });
+
+  if (Object.keys(profilePayload).length) {
+    payload.profiles = profilePayload;
+  }
+
+  if (!generalDirty && !Object.keys(profilePayload).length && !isNew) {
+    return;
+  }
+
+  docRef.set(stripUndefined(payload), { merge: true }).then(() => {
+    profileDirty = { mike: false, jen: false };
+    generalDirty = false;
+  });
+}
+
+function deleteCountryRemote(id) {
+  if (!firestoreEnabled || !firestoreDb || !id) {
+    return;
+  }
+  firestoreDb.collection("countries").doc(id).delete();
+}
+
+function stripUndefined(payload) {
+  return Object.fromEntries(
+    Object.entries(payload).filter(([, value]) => value !== undefined)
+  );
 }
 
 function buildDialogPreview() {
