@@ -671,6 +671,31 @@ function renderGallery(images) {
   });
 }
 
+function refreshOpenDialogFromData() {
+  if (!dialog || !dialog.open || !activeId) {
+    return;
+  }
+  if (generalDirty || profileDirty.mike || profileDirty.jen) {
+    return;
+  }
+  const country = countries.find((entry) => entry.id === activeId);
+  if (!country) {
+    return;
+  }
+  formFields.name.value = country.name;
+  formFields.status.value = country.status;
+  formFields.tier.value = country.tier;
+  formFields.bestTime.value = country.bestTime || "";
+  formFields.days.value = country.days || "";
+  formFields.budget.value = country.budget || "";
+  formFields.flag.value = country.flagUrl || "";
+  dialogProfileDrafts = cloneProfiles(country.profiles);
+  renderGallery(country.images || []);
+  setActiveProfile(activeProfile, true);
+  updateScorePreview();
+  updateProfileStatus();
+}
+
 function deleteCountry() {
   if (!activeId) {
     return;
@@ -954,7 +979,7 @@ if (regeneratePhotosButton) {
       if (existing) {
         existing.images = mergedImages;
         saveCountries();
-        syncCountry(existing, { isNew: false, forceProfiles: false });
+        syncCountryMedia(existing);
       } else {
         countries.push({
           id: targetId,
@@ -1330,7 +1355,7 @@ function toggleGalleryLock(index) {
   }
   image.locked = !image.locked;
   saveCountries();
-  syncCountry(existing, { isNew: false, forceProfiles: false });
+  syncCountryMedia(existing);
   renderGallery(existing.images);
 }
 
@@ -1396,6 +1421,7 @@ function subscribeToCountries() {
     suppressLocalSave = false;
     maybeBackfillFirestore(remoteCountries);
     render();
+    refreshOpenDialogFromData();
   });
 }
 
@@ -1501,6 +1527,20 @@ function syncCountry(country, { isNew, forceProfiles = false } = {}) {
     generalDirty = false;
     return true;
   });
+}
+
+function syncCountryMedia(country) {
+  if (!firestoreEnabled || !firestoreDb || !country?.id) {
+    return Promise.resolve(false);
+  }
+  const docRef = firestoreDb.collection("countries").doc(country.id);
+  const payload = {
+    flagUrl: country.flagUrl,
+    images: Array.isArray(country.images) ? country.images : [],
+    attractions: Array.isArray(country.attractions) ? country.attractions : [],
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+  };
+  return docRef.set(stripUndefined(payload), { merge: true }).then(() => true);
 }
 
 function syncCountryProfiles(country, profileKeys) {
