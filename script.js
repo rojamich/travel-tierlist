@@ -1093,9 +1093,8 @@ function formatScoreValue(value) {
 }
 
 function computeAverageScore(profiles) {
-  const totals = PROFILE_KEYS.map((key) => profiles?.[key]?.scoreTotal).filter(
-    (value) => Number.isFinite(value)
-  );
+  const totals = PROFILE_KEYS.map((key) => getProfileScoreTotal(profiles?.[key]))
+    .filter((value) => Number.isFinite(value));
   if (!totals.length) {
     return null;
   }
@@ -1103,12 +1102,26 @@ function computeAverageScore(profiles) {
   return sum / totals.length;
 }
 
+function getProfileScoreTotal(profile) {
+  if (!profile) {
+    return null;
+  }
+  const computed = computeScoreTotal(profile.scores);
+  if (Number.isFinite(computed)) {
+    return computed;
+  }
+  const rawTotal = Number(profile.scoreTotal);
+  return Number.isFinite(rawTotal) ? rawTotal : null;
+}
+
 function cloneProfiles(profiles) {
   return PROFILE_KEYS.reduce((acc, key) => {
     const profile = profiles?.[key] ?? createEmptyProfile();
     acc[key] = {
       scores: profile.scores ? { ...profile.scores } : null,
-      scoreTotal: Number.isFinite(profile.scoreTotal) ? profile.scoreTotal : null,
+      scoreTotal: Number.isFinite(getProfileScoreTotal(profile))
+        ? getProfileScoreTotal(profile)
+        : null,
       notes: profile.notes || "",
       preNotes: profile.preNotes || "",
       postNotes: profile.postNotes || "",
@@ -1234,8 +1247,8 @@ function getProfileStats() {
     jen: { scored: 0, missing: [] },
   };
   countries.forEach((country) => {
-    const mikeScored = Number.isFinite(country.profiles?.mike?.scoreTotal);
-    const jenScored = Number.isFinite(country.profiles?.jen?.scoreTotal);
+    const mikeScored = Number.isFinite(getProfileScoreTotal(country.profiles?.mike));
+    const jenScored = Number.isFinite(getProfileScoreTotal(country.profiles?.jen));
     if (mikeScored) {
       stats.mike.scored += 1;
     }
@@ -1845,7 +1858,7 @@ function computeScoreTotal(scores) {
   if (!scores) {
     return null;
   }
-  const values = scoreFields.map(({ key }) => scores[key]);
+  const values = scoreFields.map(({ key }) => Number(scores[key]));
   if (values.some((value) => !Number.isFinite(value))) {
     return null;
   }
@@ -1870,7 +1883,7 @@ function buildScoreSummary(country) {
   }
 
   const parts = PROFILE_KEYS.map((key) => {
-    const total = country.profiles?.[key]?.scoreTotal;
+    const total = getProfileScoreTotal(country.profiles?.[key]);
     if (!Number.isFinite(total)) {
       return "";
     }
