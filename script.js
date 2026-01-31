@@ -339,6 +339,7 @@ function normalizeCountry(country) {
     flagUrl: country?.flagUrl || "",
     images: normalizedImages,
     attractions: Array.isArray(country?.attractions) ? country.attractions : [],
+    localOnly: Boolean(country?.localOnly),
   };
 }
 
@@ -622,7 +623,8 @@ function upsertCountry(data) {
     );
   } else {
     const id = data.id || normalizeName(data.name).replace(/\s+/g, "-");
-    countries.push({ id, ...data });
+    const localOnly = !firestoreEnabled;
+    countries.push({ id, localOnly, ...data });
   }
   saveCountries();
   render();
@@ -764,7 +766,11 @@ form.addEventListener("submit", (event) => {
 
   const isNew = !activeId;
   const id = activeId || normalizeName(data.name).replace(/\s+/g, "-");
-  const payload = { id, ...data };
+  const payload = {
+    id,
+    ...data,
+    localOnly: !firestoreEnabled,
+  };
   profileDirty[activeProfile] = true;
   upsertCountry(payload);
   syncCountry(payload, { isNew });
@@ -1563,6 +1569,10 @@ function syncCountry(country, { isNew, forceProfiles = false } = {}) {
     updateProfileStatus();
     profileDirty = { mike: false, jen: false };
     generalDirty = false;
+    countries = countries.map((entry) =>
+      entry.id === country.id ? { ...entry, localOnly: false } : entry
+    );
+    saveCountriesLocal();
     return true;
   });
 }
@@ -1578,7 +1588,13 @@ function syncCountryMedia(country) {
     attractions: Array.isArray(country.attractions) ? country.attractions : [],
     updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
   };
-  return docRef.set(stripUndefined(payload), { merge: true }).then(() => true);
+  return docRef.set(stripUndefined(payload), { merge: true }).then(() => {
+    countries = countries.map((entry) =>
+      entry.id === country.id ? { ...entry, localOnly: false } : entry
+    );
+    saveCountriesLocal();
+    return true;
+  });
 }
 
 function syncCountryProfiles(country, profileKeys) {
@@ -1611,6 +1627,10 @@ function syncCountryProfiles(country, profileKeys) {
       };
       updateProfileStatus();
     }
+    countries = countries.map((entry) =>
+      entry.id === country.id ? { ...entry, localOnly: false } : entry
+    );
+    saveCountriesLocal();
     return true;
   });
 }
@@ -1746,7 +1766,9 @@ function mergeRemoteCountries(remoteCountries, localCountries) {
 function mergeRemoteWithLocalExtras(remoteCountries, localCountries) {
   const merged = mergeRemoteCountries(remoteCountries, localCountries);
   const remoteIds = new Set(merged.map((country) => country.id));
-  const extras = localCountries.filter((country) => !remoteIds.has(country.id));
+  const extras = localCountries.filter(
+    (country) => !remoteIds.has(country.id) && country.localOnly
+  );
   return merged.concat(extras);
 }
 
