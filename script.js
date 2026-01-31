@@ -338,7 +338,7 @@ function normalizeCountry(country) {
     profiles: normalizedProfiles,
     scoreAverage: Number.isFinite(normalizedTotal)
       ? normalizedTotal
-      : Number.isFinite(rawAverage)
+      : Number.isFinite(rawAverage) && rawAverage >= 5
         ? rawAverage
         : null,
     flagUrl: country?.flagUrl || "",
@@ -1123,10 +1123,13 @@ function getProfileScoreTotal(profile) {
   }
   const computed = computeScoreTotal(profile.scores);
   if (Number.isFinite(computed)) {
-    return computed;
+    return computed >= 5 ? computed : null;
   }
   const rawTotal = Number(profile.scoreTotal);
-  return Number.isFinite(rawTotal) ? rawTotal : null;
+  if (!Number.isFinite(rawTotal)) {
+    return null;
+  }
+  return rawTotal >= 5 ? rawTotal : null;
 }
 
 function cloneProfiles(profiles) {
@@ -1694,13 +1697,16 @@ function maybeBackfillFirestore(remoteCountries) {
       return;
     }
     const missingProfileKeys = PROFILE_KEYS.filter((key) => {
-      const localScore = localCountry.profiles?.[key]?.scoreTotal;
-      const remoteScore = remoteCountry.profiles?.[key]?.scoreTotal;
+      const localScore = getProfileScoreTotal(localCountry.profiles?.[key]);
+      const remoteScore = getProfileScoreTotal(remoteCountry.profiles?.[key]);
       return Number.isFinite(localScore) && !Number.isFinite(remoteScore);
     });
+    const localAverage = Number(localCountry.scoreAverage);
+    const remoteAverage = Number(remoteCountry.scoreAverage);
     const missingAverage =
-      Number.isFinite(localCountry.scoreAverage) &&
-      !Number.isFinite(remoteCountry.scoreAverage);
+      Number.isFinite(localAverage) &&
+      localAverage >= 5 &&
+      !Number.isFinite(remoteAverage);
     if (missingProfileKeys.length || missingAverage) {
       needsBackfill = true;
       syncCountryProfiles(localCountry, missingProfileKeys);
@@ -1894,7 +1900,14 @@ function computeScoreTotal(scores) {
   if (!scores) {
     return null;
   }
-  const values = scoreFields.map(({ key }) => Number(scores[key]));
+  const values = scoreFields.map(({ key }) => {
+    const raw = scores[key];
+    if (raw === null || raw === undefined || raw === "") {
+      return null;
+    }
+    const value = Number(raw);
+    return Number.isFinite(value) ? value : null;
+  });
   if (values.some((value) => !Number.isFinite(value))) {
     return null;
   }
