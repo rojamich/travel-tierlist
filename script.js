@@ -1618,20 +1618,35 @@ function syncCountryProfiles(country, profileKeys) {
     return Promise.resolve(false);
   }
   const docRef = firestoreDb.collection("countries").doc(country.id);
-  const payload = {};
-  keys.forEach((key) => {
-    const profile = country.profiles?.[key] ?? createEmptyProfile();
-    const scoreTotal = getProfileScoreTotal(profile);
-    payload[`profiles.${key}`] = {
-      scores: profile.scores,
-      scoreTotal: Number.isFinite(scoreTotal) ? scoreTotal : null,
-      notes: profile.notes,
-      preNotes: profile.preNotes,
-      postNotes: profile.postNotes,
+  return docRef.get().then((snapshot) => {
+    const remote = snapshot.exists ? normalizeCountry({ id: snapshot.id, ...snapshot.data() }) : null;
+    const mergedProfiles = cloneProfiles(remote?.profiles || {});
+    keys.forEach((key) => {
+      const profile = country.profiles?.[key] ?? createEmptyProfile();
+      const scoreTotal = getProfileScoreTotal(profile);
+      const localHasData =
+        Number.isFinite(scoreTotal) ||
+        Boolean(profile.notes || profile.preNotes || profile.postNotes);
+      if (!localHasData) {
+        return;
+      }
+      mergedProfiles[key] = {
+        scores: profile.scores,
+        scoreTotal: Number.isFinite(scoreTotal) ? scoreTotal : null,
+        notes: profile.notes,
+        preNotes: profile.preNotes,
+        postNotes: profile.postNotes,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      };
+    });
+    const average = computeAverageScore(mergedProfiles);
+    const payload = {
+      profiles: mergedProfiles,
+      scoreAverage: Number.isFinite(average) ? average : null,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
     };
-  });
-  return docRef.set(stripUndefined(payload), { merge: true }).then(() => {
+    return docRef.set(stripUndefined(payload), { merge: true });
+  }).then(() => {
     if (keys.includes(activeProfile)) {
       dialogProfileDrafts[activeProfile] = {
         ...dialogProfileDrafts[activeProfile],
