@@ -734,9 +734,16 @@ form.addEventListener("submit", (event) => {
   if (countryInput) {
     countryInput.setCustomValidity("");
   }
-  const activeCountry = activeId
+  let activeCountry = activeId
     ? countries.find((country) => country.id === activeId)
     : null;
+  const existingCountry = countries.find(
+    (country) => normalizeName(country.name) === normalizeName(formFields.name.value)
+  );
+  if (existingCountry && !activeId) {
+    activeId = existingCountry.id;
+    activeCountry = existingCountry;
+  }
   const mergedProfiles = mergeProfiles(
     activeCountry?.profiles,
     dialogProfileDrafts,
@@ -765,14 +772,6 @@ form.addEventListener("submit", (event) => {
 
   if (!data.name) {
     formFields.name.focus();
-    return;
-  }
-
-  const existingCountry = countries.find(
-    (country) => normalizeName(country.name) === normalizeName(data.name)
-  );
-  if (existingCountry && !activeId) {
-    openDialog(existingCountry);
     return;
   }
 
