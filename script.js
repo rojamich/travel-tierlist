@@ -1175,14 +1175,15 @@ function buildProfileFromForm() {
   const scores = readScoreInputs();
   const hasAnyScore = Object.values(scores).some((value) => Number.isFinite(value));
   const scoreTotal = computeScoreTotal(scores);
-  const fallbackTotal = dialogProfileDrafts[activeProfile]?.scoreTotal;
+  const existingDraft = dialogProfileDrafts[activeProfile] || createEmptyProfile();
+  const fallbackTotal = existingDraft.scoreTotal;
   const normalizedTotal = Number.isFinite(scoreTotal)
     ? scoreTotal
     : !hasAnyScore && Number.isFinite(fallbackTotal)
       ? fallbackTotal
       : null;
   return {
-    scores: hasAnyScore ? scores : null,
+    scores: hasAnyScore ? scores : existingDraft.scores || null,
     scoreTotal: normalizedTotal,
     notes: formFields.notes.value.trim(),
     preNotes: formFields.preNotes.value.trim(),
