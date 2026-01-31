@@ -282,7 +282,12 @@ function normalizeCountry(country) {
       profile && typeof profile.scores === "object" ? profile.scores : null;
     const normalizedScores = rawScores
       ? scoreFields.reduce((scoreAcc, { key: scoreKey }) => {
-          const value = Number(rawScores[scoreKey]);
+          const rawValue = rawScores[scoreKey];
+          if (rawValue === "" || rawValue === null || rawValue === undefined) {
+            scoreAcc[scoreKey] = null;
+            return scoreAcc;
+          }
+          const value = Number(rawValue);
           scoreAcc[scoreKey] = Number.isFinite(value) ? value : null;
           return scoreAcc;
         }, {})
@@ -1875,6 +1880,10 @@ function readScoreInputs() {
   const values = {};
   scoreFields.forEach(({ key }) => {
     const raw = formFields.scores[key]?.value ?? "";
+    if (raw === "") {
+      values[key] = null;
+      return;
+    }
     const parsed = Number(raw);
     values[key] = Number.isFinite(parsed) ? parsed : null;
   });
