@@ -774,6 +774,10 @@ form.addEventListener("submit", (event) => {
   profileDirty[activeProfile] = true;
   upsertCountry(payload);
   syncCountry(payload, { isNew });
+  const activeProfileData = payload.profiles?.[activeProfile];
+  if (shouldSyncProfile(activeProfileData)) {
+    syncCountryProfiles(payload, [activeProfile]);
+  }
   closeDialog();
 });
 
