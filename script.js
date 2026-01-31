@@ -1630,9 +1630,21 @@ function syncCountryProfiles(country, profileKeys) {
       if (!localHasData) {
         return;
       }
+      const localCompleteScores = Number.isFinite(computeScoreTotal(profile.scores));
+      const remoteCompleteScores = Number.isFinite(
+        computeScoreTotal(mergedProfiles[key]?.scores)
+      );
+      const base = remoteCompleteScores && !localCompleteScores
+        ? mergedProfiles[key]
+        : {
+            scores: profile.scores,
+            scoreTotal: Number.isFinite(scoreTotal) ? scoreTotal : null,
+            notes: mergedProfiles[key]?.notes || "",
+            preNotes: mergedProfiles[key]?.preNotes || "",
+            postNotes: mergedProfiles[key]?.postNotes || "",
+          };
       mergedProfiles[key] = {
-        scores: profile.scores,
-        scoreTotal: Number.isFinite(scoreTotal) ? scoreTotal : null,
+        ...base,
         notes: profile.notes,
         preNotes: profile.preNotes,
         postNotes: profile.postNotes,
@@ -1760,6 +1772,8 @@ function mergeRemoteCountries(remoteCountries, localCountries) {
       const remoteStamp = getTimestampValue(remoteProfile.updatedAt);
       const localHasScore = Number.isFinite(getProfileScoreTotal(localProfile));
       const remoteHasScore = Number.isFinite(getProfileScoreTotal(remoteProfile));
+      const localCompleteScores = Number.isFinite(computeScoreTotal(localProfile.scores));
+      const remoteCompleteScores = Number.isFinite(computeScoreTotal(remoteProfile.scores));
       const localHasNotes = Boolean(
         localProfile.notes || localProfile.preNotes || localProfile.postNotes
       );
@@ -1768,6 +1782,14 @@ function mergeRemoteCountries(remoteCountries, localCountries) {
       );
       const localHasData = localHasScore || localHasNotes;
       const remoteHasData = remoteHasScore || remoteHasNotes;
+      if (remoteCompleteScores && !localCompleteScores) {
+        acc[key] = remoteProfile;
+        return acc;
+      }
+      if (localCompleteScores && !remoteCompleteScores) {
+        acc[key] = localProfile;
+        return acc;
+      }
       if (remoteHasData && !localHasData) {
         acc[key] = remoteProfile;
       } else if (localHasData && !remoteHasData) {
