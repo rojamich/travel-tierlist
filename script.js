@@ -1871,39 +1871,44 @@ function buildDialogPreview() {
   };
 }
 
+function buildRevealPreview() {
+  const activeDraft = buildProfileFromForm();
+  const total = getProfileScoreTotal(activeDraft);
+  return {
+    name: formFields.name.value.trim() || "Score reveal",
+    profileKey: activeProfile,
+    profile: activeDraft,
+    total: Number.isFinite(total) ? total : null,
+  };
+}
+
 function openRevealDialog() {
   if (!revealDialog) {
     return;
   }
-  const preview = buildDialogPreview();
-  const scoreSummary = buildScoreSummary(preview);
-  const mikeBreakdown = buildProfileBreakdown(preview.profiles.mike);
-  const jenBreakdown = buildProfileBreakdown(preview.profiles.jen);
-  const tier = getScoreTier(preview.scoreAverage);
+  const preview = buildRevealPreview();
+  const tier = getScoreTier(preview.total);
+  const breakdown = buildProfileBreakdown(preview.profile);
+  const profileLabel = preview.profileKey === "mike" ? "Mike" : "Jen";
 
   if (revealTitle) {
     revealTitle.textContent = preview.name || "Score reveal";
   }
   if (revealSubtitle) {
-    revealSubtitle.textContent = "Average of Mike and Jen.";
+    revealSubtitle.textContent = `${profileLabel}'s score preview.`;
   }
   if (revealScoreValue) {
-    revealScoreValue.textContent = scoreSummary.totalText;
+    revealScoreValue.textContent = Number.isFinite(preview.total)
+      ? `${formatScoreValue(preview.total)} / 25`
+      : "Not scored";
   }
   if (revealTier) {
     revealTier.textContent = tier === "unranked" ? "-" : tier;
     revealTier.dataset.tier = tier;
   }
   if (revealBreakdown) {
-    const breakdownParts = [];
-    if (mikeBreakdown) {
-      breakdownParts.push(`Mike: ${mikeBreakdown}`);
-    }
-    if (jenBreakdown) {
-      breakdownParts.push(`Jen: ${jenBreakdown}`);
-    }
     revealBreakdown.textContent =
-      breakdownParts.join(" | ") || scoreSummary.breakdownText;
+      breakdown || "Add scores to generate a tier.";
   }
 
   revealDialog.showModal();
