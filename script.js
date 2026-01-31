@@ -1811,6 +1811,7 @@ function mergeRemoteCountries(remoteCountries, localCountries) {
         ? remote.attractions
         : local.attractions,
       flagUrl: remote.flagUrl || local.flagUrl,
+      localOnly: false,
     };
   });
 }
