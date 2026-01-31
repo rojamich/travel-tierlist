@@ -1115,6 +1115,13 @@ function formatScoreValue(value) {
   return value % 1 === 0 ? String(value) : value.toFixed(1);
 }
 
+function hasAnyScoreValues(scores) {
+  if (!scores || typeof scores !== "object") {
+    return false;
+  }
+  return scoreFields.some(({ key }) => Number.isFinite(Number(scores[key])));
+}
+
 function computeAverageScore(profiles) {
   const totals = PROFILE_KEYS.map((key) => getProfileScoreTotal(profiles?.[key]))
     .filter((value) => Number.isFinite(value));
@@ -1634,6 +1641,7 @@ function syncCountryProfiles(country, profileKeys) {
       const profile = country.profiles?.[key] ?? createEmptyProfile();
       const scoreTotal = getProfileScoreTotal(profile);
       const localHasData =
+        hasAnyScoreValues(profile.scores) ||
         Number.isFinite(scoreTotal) ||
         Boolean(profile.notes || profile.preNotes || profile.postNotes);
       if (!localHasData) {
@@ -1687,7 +1695,9 @@ function shouldSyncProfile(profile) {
   if (!profile) {
     return false;
   }
-  const hasScores = Number.isFinite(getProfileScoreTotal(profile));
+  const hasScores =
+    hasAnyScoreValues(profile.scores) ||
+    Number.isFinite(getProfileScoreTotal(profile));
   const hasNotes = Boolean(profile.notes || profile.preNotes || profile.postNotes);
   return hasScores || hasNotes;
 }
@@ -1783,14 +1793,16 @@ function mergeRemoteCountries(remoteCountries, localCountries) {
       const remoteHasScore = Number.isFinite(getProfileScoreTotal(remoteProfile));
       const localCompleteScores = Number.isFinite(computeScoreTotal(localProfile.scores));
       const remoteCompleteScores = Number.isFinite(computeScoreTotal(remoteProfile.scores));
+      const localHasAnyScore = hasAnyScoreValues(localProfile.scores);
+      const remoteHasAnyScore = hasAnyScoreValues(remoteProfile.scores);
       const localHasNotes = Boolean(
         localProfile.notes || localProfile.preNotes || localProfile.postNotes
       );
       const remoteHasNotes = Boolean(
         remoteProfile.notes || remoteProfile.preNotes || remoteProfile.postNotes
       );
-      const localHasData = localHasScore || localHasNotes;
-      const remoteHasData = remoteHasScore || remoteHasNotes;
+      const localHasData = localHasAnyScore || localHasScore || localHasNotes;
+      const remoteHasData = remoteHasAnyScore || remoteHasScore || remoteHasNotes;
       if (remoteCompleteScores && !localCompleteScores) {
         acc[key] = remoteProfile;
         return acc;
