@@ -619,6 +619,13 @@ function openDialog(country = null) {
 
 function closeDialog() {
   dialog.close();
+  activeId = null;
+  if (formFields.name) {
+    formFields.name.disabled = false;
+  }
+  if (randomCountryButton) {
+    randomCountryButton.disabled = false;
+  }
 }
 
 function upsertCountry(data) {
@@ -965,6 +972,7 @@ if (revealScoreButton) {
     if (!scoreSection) {
       return;
     }
+    storeActiveProfileDraft();
     scoreSection.classList.add("revealed");
     openRevealDialog();
   });
@@ -1873,6 +1881,7 @@ function buildDialogPreview() {
 
 function buildRevealPreview() {
   const activeDraft = buildProfileFromForm();
+  dialogProfileDrafts[activeProfile] = activeDraft;
   const total = getProfileScoreTotal(activeDraft);
   return {
     name: formFields.name.value.trim() || "Score reveal",
