@@ -77,6 +77,8 @@ test('unsaved edits are recoverable after closing and reopening the app', async 
   await add(page, 'Svalbard');
   await page.locator('#profile-notes').fill('Remember the fjords');
   await page.locator('#close-editor').click();
+  await expect(page.locator('#toast')).toBeVisible();
+  await expect(page.locator('#toast')).toContainText('Draft saved on this device');
   await page.reload();
   await page.locator('#resume-draft').click();
   await expect(page.locator('#destination-name')).toHaveValue('Svalbard');

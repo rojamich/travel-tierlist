@@ -623,13 +623,14 @@ async function closeEditor({ discard = false } = {}) {
   photoRequest = null;
   clearTimeout(draftTimer);
   collectEditor();
-  if (!discard && hasChanges()) {
+  const savedDraft = !discard && hasChanges();
+  if (savedDraft) {
     await store.saveDraft(session);
-    toast('Draft saved on this device. Continue editing from the banner.');
   } else await store.clearDraft();
   session = null;
   $('#country-dialog').close();
   render();
+  if (savedDraft) toast('Draft saved on this device. Continue editing from the banner.');
 }
 function revealScore() {
   const score = phaseTotal(session.country.profiles[session.activeProfile][session.phase]);
