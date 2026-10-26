@@ -1,82 +1,415 @@
 <!doctype html>
 <html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#154f4b" />
-  <meta name="description" content="Your shared travel rankings, trip notes, and next adventures. Available offline." />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' https: data:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://*.firebaseapp.com https://api.pexels.com; frame-src https://travel-tiers.firebaseapp.com; object-src 'none'; base-uri 'self'; form-action 'self'" />
-  <title>Travel Tiers</title>
-  <link rel="icon" href="./icons/icon.svg" type="image/svg+xml" />
-  <link rel="manifest" href="./manifest.webmanifest" />
-  <link rel="stylesheet" href="/styles.css" />
-</head>
-<body>
-  <a class="skip-link" href="#content">Skip to your destinations</a>
-  <header class="app-header">
-    <a class="brand" href="#board" aria-label="Travel Tiers home"><img src="./icons/icon.svg" width="42" height="42" alt="" /><span>Travel <em>Tiers</em><small>A world worth remembering</small></span></a>
-    <button id="connection-button" class="connection" aria-label="Open sync settings"><span class="status-dot"></span><span id="connection-label">On this device</span></button>
-  </header>
-  <div id="update-banner" class="banner" hidden>An update is ready. <button id="apply-update">Restart app</button></div>
-  <div id="draft-banner" class="banner" hidden>You have an unfinished destination. <button id="resume-draft">Continue editing</button><button id="discard-draft">Discard</button></div>
-  <main id="content" tabindex="-1">
-    <section class="page" id="page-board" aria-labelledby="board-heading">
-      <div class="page-title"><div><p class="eyebrow">YOUR WORLD, YOUR RATINGS</p><h1 id="board-heading">Where would you go back?</h1><p class="subtle">Keep the memories. Find your next adventure.</p></div><button class="primary" data-action="add">＋ Add destination</button></div>
-      <div id="overview" class="overview"></div>
-      <section class="queue-card" aria-label="Rating progress"><div><p class="eyebrow">A LITTLE CATCHING UP</p><h2>Make it a shared opinion.</h2><p id="queue-summary" class="subtle"></p></div><div id="queue-actions" class="queue-actions"></div></section>
-      <details id="rating-queues" class="rating-queues"></details>
-      <div id="filters-slot"></div>
-      <div class="results-heading"><h2>Your tier board</h2><span id="result-count" class="subtle"></span></div>
-      <div id="tier-board"></div>
-    </section>
-    <section class="page" id="page-countries" aria-labelledby="countries-heading" hidden>
-      <div class="page-title"><div><p class="eyebrow">THE DETAILS THAT MATTER</p><h1 id="countries-heading">Your destinations</h1><p class="subtle">Notes, budgets, and both sides of the story.</p></div><button class="primary" data-action="add">＋ Add destination</button></div>
-      <div id="countries-filters-slot"></div>
-      <div id="country-cards" class="country-cards"></div>
-    </section>
-    <section class="page settings-page" id="page-settings" aria-labelledby="settings-heading" hidden>
-      <div class="page-title"><div><p class="eyebrow">READY FOR THE NEXT TRIP</p><h1 id="settings-heading">Your app, your data</h1><p class="subtle">Works offline. Syncs when you’re ready.</p></div></div>
-      <section class="settings-card"><h2>Shared list</h2><p id="sync-message" role="status">Your changes are saved on this device. Sign in to share them across your phones.</p><p id="account-label" class="subtle"></p>
-        <form id="auth-form"><label>Email<input type="email" id="auth-email" autocomplete="username" required /></label><label>Password<input type="password" id="auth-password" autocomplete="current-password" minlength="6" required /></label><div class="button-row"><button class="primary" type="submit">Sign in</button><button id="register-account" type="button">Create account</button><button id="reset-password" class="text-button" type="button">Forgot password?</button></div></form>
-        <div id="account-actions" class="button-row" hidden><button id="retry-sync" class="primary">Sync now</button><button id="verify-email">Send verification email</button><button id="refresh-account">I’ve verified my email</button><button id="sign-out">Sign out</button></div>
-        <div id="conflicts"></div>
-      </section>
-      <section class="settings-card"><h2>Backup & recovery</h2><p class="subtle">Export a copy before a big trip. Your last ten recovery points stay on this device.</p><p class="helper" id="migration-message" hidden></p><div class="button-row"><button id="export-backup" class="primary">Export backup</button><label class="button" for="import-backup">Import backup</label><input id="import-backup" class="visually-hidden" type="file" accept="application/json,.json" /><button id="export-legacy" hidden>Export original data</button></div><div id="recovery-points"></div></section>
-      <section class="settings-card"><h2>Attraction photos</h2><p class="subtle">Use your Pexels key to find photos. Photo search needs a connection; your saved ratings and notes don’t.</p><form id="photo-settings"><label>Pexels API key<input type="password" id="pexels-key" autocomplete="off" /></label><button type="submit">Save photo key</button></form></section>
-      <section class="settings-card" id="install-card"><h2>Take it with you</h2><p id="install-help">Install Travel Tiers on Android to open it from your home screen and keep using it offline.</p><button id="install-app" hidden>Install app</button><a class="button" href="https://github.com/rojamich/travel-tierlist/actions" target="_blank" rel="noopener noreferrer">Android downloads</a></section>
-      <section class="settings-card danger-zone"><h2>This device</h2><p class="subtle">Clearing this device removes its saved list, drafts, and recovery points. It does not delete the shared cloud list.</p><button id="clear-device" class="danger">Clear this device</button><p class="version">Travel Tiers 2.0 · Made for Mike & Jen</p></section>
-    </section>
-  </main>
-  <nav class="bottom-nav" aria-label="Main navigation"><a href="#board" data-page="board" aria-current="page"><span aria-hidden="true">▦</span>Tier board</a><a href="#countries" data-page="countries"><span aria-hidden="true">◎</span>Destinations</a><a href="#settings" data-page="settings"><span aria-hidden="true">⚙</span>Settings</a></nav>
-  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
-
-  <dialog id="country-dialog" aria-labelledby="dialog-title">
-    <form id="country-form" class="editor">
-      <header class="editor-header"><div><p class="eyebrow" id="editor-caption">DESTINATION DETAILS</p><h2 id="dialog-title">Add destination</h2></div><button type="button" id="close-editor" class="icon-button" aria-label="Close destination editor">×</button></header>
-      <div class="editor-body">
-        <div class="two-columns"><label>Destination<input id="destination-name" list="country-options" maxlength="100" required placeholder="Country, region, or special trip" /></label><label>Trip status<select id="destination-status"><option value="not-visited">Not visited</option><option value="planning">Planning</option><option value="visited">Visited</option></select></label></div>
-        <datalist id="country-options"></datalist><p id="destination-hint" class="helper">Choose a country or add a custom destination, like Antarctica.</p>
-        <div class="rating-editor"><div class="section-heading"><h3>Your perspective</h3><span class="tag" id="phase-help"></span></div>
-          <div class="segmented" role="group" aria-label="Person rating"><button type="button" data-profile="mike" aria-pressed="true">Mike</button><button type="button" data-profile="jen" aria-pressed="false">Jen</button></div>
-          <div class="segmented stage-switch" role="group" aria-label="Rating stage"><button type="button" data-phase="expected" aria-pressed="true">Before the trip</button><button type="button" data-phase="experienced" aria-pressed="false">After the trip</button></div>
-          <p class="helper" id="rating-help"></p><div id="score-fields" class="score-fields"></div>
-          <div class="button-row"><button type="button" id="reveal-score">Reveal this score</button><button type="button" id="clear-profile-scores" class="text-button">Clear this rating</button></div><p id="score-preview" class="score-preview" hidden></p>
-          <label id="profile-notes-label">Mike’s notes<textarea id="profile-notes" rows="3" maxlength="20000" placeholder="What makes this destination special?"></textarea></label>
-          <div class="two-columns"><label>Before-you-go notes<textarea id="profile-pre-notes" rows="3" maxlength="20000"></textarea></label><label>After-the-trip notes<textarea id="profile-post-notes" rows="3" maxlength="20000"></textarea></label></div>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#154f4b" />
+    <meta
+      name="description"
+      content="Your shared travel rankings, trip notes, and next adventures. Available offline."
+    />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' https: data:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://*.firebaseapp.com https://api.pexels.com; frame-src https://travel-tiers.firebaseapp.com; object-src 'none'; base-uri 'self'; form-action 'self'"
+    />
+    <title>Travel Tiers</title>
+    <link rel="icon" href="./icons/icon.svg" type="image/svg+xml" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#content">Skip to your destinations</a>
+    <header class="app-header">
+      <a class="brand" href="#board" aria-label="Travel Tiers home"
+        ><img src="./icons/icon.svg" width="42" height="42" alt="" /><span
+          >Travel <em>Tiers</em><small>A world worth remembering</small></span
+        ></a
+      >
+      <button id="connection-button" class="connection" aria-label="Open sync settings">
+        <span class="status-dot"></span><span id="connection-label">On this device</span>
+      </button>
+    </header>
+    <div id="update-banner" class="banner" hidden>
+      An update is ready. <button id="apply-update">Restart app</button>
+    </div>
+    <div id="draft-banner" class="banner" hidden>
+      You have an unfinished destination. <button id="resume-draft">Continue editing</button
+      ><button id="discard-draft">Discard</button>
+    </div>
+    <main id="content" tabindex="-1">
+      <section class="page" id="page-board" aria-labelledby="board-heading">
+        <div class="page-title">
+          <div>
+            <p class="eyebrow">YOUR WORLD, YOUR RATINGS</p>
+            <h1 id="board-heading">Where would you go back?</h1>
+            <p class="subtle">Keep the memories. Find your next adventure.</p>
+          </div>
+          <button class="primary" data-action="add">＋ Add destination</button>
         </div>
-        <details class="editor-details" open><summary>Trip planning & budget</summary><div class="two-columns"><label>Best time to go<input id="destination-season" maxlength="500" placeholder="e.g. April–May" /></label><label>Time needed<input id="destination-days" maxlength="500" placeholder="e.g. 10–14 days" /></label></div>
-          <div class="two-columns"><label>Budget amount<input id="budget-amount" type="number" min="0" max="1000000000" step="0.01" inputmode="decimal" /></label><label>Currency<select id="budget-currency"><option>USD</option><option>EUR</option><option>GBP</option><option>CAD</option><option>AUD</option><option>ARS</option><option>GEL</option><option>JPY</option><option>VND</option><option>THB</option><option>Other</option></select><input id="budget-custom-currency" maxlength="3" pattern="[A-Za-z]{3}" aria-label="Three-letter currency code" placeholder="Currency code" hidden /></label><label>Budget covers<select id="budget-basis"><option value="person">One person</option><option value="couple">Both of us</option></select></label><label>Budget duration (days)<input id="budget-duration" type="number" min="1" max="3650" step="1" inputmode="numeric" placeholder="e.g. 28" /></label></div><p id="legacy-budget" class="helper" hidden></p>
-          <label>Places & interests<input id="destination-attractions" maxlength="6000" placeholder="Separate with commas: hiking, food, temples" /></label>
-        </details>
-        <details class="editor-details"><summary>Attraction gallery</summary><p class="helper">Lock favorites before regenerating. Photos are saved when you save this destination.</p><div class="button-row"><button id="regenerate-photos" type="button">Find photos</button></div><p id="photo-status" class="helper" role="status"></p><div id="photo-gallery" class="gallery"></div></details>
-        <details class="editor-details"><summary>Display options</summary><label class="check"><input id="auto-tier" type="checkbox" checked /> Choose tier automatically from ratings</label><label id="manual-tier-label" hidden>Manual tier<select id="manual-tier"><option>S</option><option>A</option><option>B</option><option>C</option><option>D</option></select></label><label>Flag image URL<input id="destination-flag" type="url" maxlength="2048" placeholder="https://…" /></label></details>
-        <p id="editor-error" class="error" role="alert" hidden></p>
-      </div>
-      <footer class="editor-footer"><div class="button-row"><button type="button" id="delete-destination" class="danger text-button">Delete</button><button type="button" id="reset-destination" class="text-button">Clear both ratings</button></div><button type="submit" class="primary" id="save-destination">Save destination</button></footer>
-    </form>
-  </dialog>
-  <dialog id="confirm-dialog" aria-labelledby="confirm-title"><form method="dialog" class="confirmation"><h2 id="confirm-title"></h2><p id="confirm-description"></p><div class="button-row"><button value="cancel">Cancel</button><button class="primary" value="confirm" id="confirm-accept">Continue</button></div></form></dialog>
-  <dialog id="import-dialog" aria-labelledby="import-title"><form id="import-form" class="confirmation"><h2 id="import-title">Import your destinations</h2><p id="import-summary"></p><label>How should we combine the lists?<select id="import-mode"><option value="merge">Merge; imported entries replace matching names</option><option value="replace">Replace the current list</option></select></label><p class="helper">A recovery point is saved before importing.</p><div class="button-row"><button id="cancel-import" type="button">Cancel</button><button class="primary" type="submit">Import destinations</button></div></form></dialog>
-  <script type="module" src="/src/app.js"></script>
-</body>
+        <div id="overview" class="overview"></div>
+        <section class="queue-card" aria-label="Rating progress">
+          <div>
+            <p class="eyebrow">A LITTLE CATCHING UP</p>
+            <h2>Make it a shared opinion.</h2>
+            <p id="queue-summary" class="subtle"></p>
+          </div>
+          <div id="queue-actions" class="queue-actions"></div>
+        </section>
+        <details id="rating-queues" class="rating-queues"></details>
+        <div id="filters-slot"></div>
+        <div class="results-heading">
+          <h2>Your tier board</h2>
+          <span id="result-count" class="subtle"></span>
+        </div>
+        <div id="tier-board"></div>
+      </section>
+      <section class="page" id="page-countries" aria-labelledby="countries-heading" hidden>
+        <div class="page-title">
+          <div>
+            <p class="eyebrow">THE DETAILS THAT MATTER</p>
+            <h1 id="countries-heading">Your destinations</h1>
+            <p class="subtle">Notes, budgets, and both sides of the story.</p>
+          </div>
+          <button class="primary" data-action="add">＋ Add destination</button>
+        </div>
+        <div id="countries-filters-slot"></div>
+        <div id="country-cards" class="country-cards"></div>
+      </section>
+      <section
+        class="page settings-page"
+        id="page-settings"
+        aria-labelledby="settings-heading"
+        hidden
+      >
+        <div class="page-title">
+          <div>
+            <p class="eyebrow">READY FOR THE NEXT TRIP</p>
+            <h1 id="settings-heading">Your app, your data</h1>
+            <p class="subtle">Works offline. Syncs when you’re ready.</p>
+          </div>
+        </div>
+        <section class="settings-card">
+          <h2>Shared list</h2>
+          <p id="sync-message" role="status">
+            Your changes are saved on this device. Sign in to share them across your phones.
+          </p>
+          <p id="account-label" class="subtle"></p>
+          <form id="auth-form">
+            <label
+              >Email<input type="email" id="auth-email" autocomplete="username" required /></label
+            ><label
+              >Password<input
+                type="password"
+                id="auth-password"
+                autocomplete="current-password"
+                minlength="6"
+                required
+            /></label>
+            <div class="button-row">
+              <button class="primary" type="submit">Sign in</button
+              ><button id="register-account" type="button">Create account</button
+              ><button id="reset-password" class="text-button" type="button">
+                Forgot password?
+              </button>
+            </div>
+          </form>
+          <div id="account-actions" class="button-row" hidden>
+            <button id="retry-sync" class="primary">Sync now</button
+            ><button id="verify-email">Send verification email</button
+            ><button id="refresh-account">I’ve verified my email</button
+            ><button id="sign-out">Sign out</button>
+          </div>
+          <div id="conflicts"></div>
+        </section>
+        <section class="settings-card">
+          <h2>Backup & recovery</h2>
+          <p class="subtle">
+            Export a copy before a big trip. Your last ten recovery points stay on this device.
+          </p>
+          <p class="helper" id="migration-message" hidden></p>
+          <div class="button-row">
+            <button id="export-backup" class="primary">Export backup</button
+            ><label class="button" for="import-backup">Import backup</label
+            ><input
+              id="import-backup"
+              class="visually-hidden"
+              type="file"
+              accept="application/json,.json"
+            /><button id="export-legacy" hidden>Export original data</button>
+          </div>
+          <div id="recovery-points"></div>
+        </section>
+        <section class="settings-card">
+          <h2>Attraction photos</h2>
+          <p class="subtle">
+            Use your Pexels key to find photos. Photo search needs a connection; your saved ratings
+            and notes don’t.
+          </p>
+          <form id="photo-settings">
+            <label>Pexels API key<input type="password" id="pexels-key" autocomplete="off" /></label
+            ><button type="submit">Save photo key</button>
+          </form>
+        </section>
+        <section class="settings-card" id="install-card">
+          <h2>Take it with you</h2>
+          <p id="install-help">
+            Install Travel Tiers on Android to open it from your home screen and keep using it
+            offline.
+          </p>
+          <button id="install-app" hidden>Install app</button
+          ><a
+            class="button"
+            href="https://github.com/rojamich/travel-tierlist/actions"
+            target="_blank"
+            rel="noopener noreferrer"
+            >Android downloads</a
+          >
+        </section>
+        <section class="settings-card danger-zone">
+          <h2>This device</h2>
+          <p class="subtle">
+            Clearing this device removes its saved list, drafts, and recovery points. It does not
+            delete the shared cloud list.
+          </p>
+          <button id="clear-device" class="danger">Clear this device</button>
+          <p class="version">Travel Tiers 2.0 · Made for Mike & Jen</p>
+        </section>
+      </section>
+    </main>
+    <nav class="bottom-nav" aria-label="Main navigation">
+      <a href="#board" data-page="board" aria-current="page"
+        ><span aria-hidden="true">▦</span>Tier board</a
+      ><a href="#countries" data-page="countries"><span aria-hidden="true">◎</span>Destinations</a
+      ><a href="#settings" data-page="settings"><span aria-hidden="true">⚙</span>Settings</a>
+    </nav>
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+    <dialog id="country-dialog" aria-labelledby="dialog-title">
+      <form id="country-form" class="editor">
+        <header class="editor-header">
+          <div>
+            <p class="eyebrow" id="editor-caption">DESTINATION DETAILS</p>
+            <h2 id="dialog-title">Add destination</h2>
+          </div>
+          <button
+            type="button"
+            id="close-editor"
+            class="icon-button"
+            aria-label="Close destination editor"
+          >
+            ×
+          </button>
+        </header>
+        <div class="editor-body">
+          <div class="two-columns">
+            <label
+              >Destination<input
+                id="destination-name"
+                list="country-options"
+                maxlength="100"
+                required
+                placeholder="Country, region, or special trip" /></label
+            ><label
+              >Trip status<select id="destination-status">
+                <option value="not-visited">Not visited</option>
+                <option value="planning">Planning</option>
+                <option value="visited">Visited</option>
+              </select></label
+            >
+          </div>
+          <datalist id="country-options"></datalist>
+          <p id="destination-hint" class="helper">
+            Choose a country or add a custom destination, like Antarctica.
+          </p>
+          <div class="rating-editor">
+            <div class="section-heading">
+              <h3>Your perspective</h3>
+              <span class="tag" id="phase-help"></span>
+            </div>
+            <div class="segmented" role="group" aria-label="Person rating">
+              <button type="button" data-profile="mike" aria-pressed="true">Mike</button
+              ><button type="button" data-profile="jen" aria-pressed="false">Jen</button>
+            </div>
+            <div class="segmented stage-switch" role="group" aria-label="Rating stage">
+              <button type="button" data-phase="expected" aria-pressed="true">
+                Before the trip</button
+              ><button type="button" data-phase="experienced" aria-pressed="false">
+                After the trip
+              </button>
+            </div>
+            <p class="helper" id="rating-help"></p>
+            <div id="score-fields" class="score-fields"></div>
+            <div class="button-row">
+              <button type="button" id="reveal-score">Reveal this score</button
+              ><button type="button" id="clear-profile-scores" class="text-button">
+                Clear this rating
+              </button>
+            </div>
+            <p id="score-preview" class="score-preview" hidden></p>
+            <label id="profile-notes-label"
+              >Mike’s notes<textarea
+                id="profile-notes"
+                rows="3"
+                maxlength="20000"
+                placeholder="What makes this destination special?"
+              ></textarea>
+            </label>
+            <div class="two-columns">
+              <label
+                >Before-you-go notes<textarea
+                  id="profile-pre-notes"
+                  rows="3"
+                  maxlength="20000"
+                ></textarea></label
+              ><label
+                >After-the-trip notes<textarea
+                  id="profile-post-notes"
+                  rows="3"
+                  maxlength="20000"
+                ></textarea>
+              </label>
+            </div>
+          </div>
+          <details class="editor-details" open>
+            <summary>Trip planning & budget</summary>
+            <div class="two-columns">
+              <label
+                >Best time to go<input
+                  id="destination-season"
+                  maxlength="500"
+                  placeholder="e.g. April–May" /></label
+              ><label
+                >Time needed<input
+                  id="destination-days"
+                  maxlength="500"
+                  placeholder="e.g. 10–14 days"
+              /></label>
+            </div>
+            <div class="two-columns">
+              <label
+                >Budget amount<input
+                  id="budget-amount"
+                  type="number"
+                  min="0"
+                  max="1000000000"
+                  step="0.01"
+                  inputmode="decimal" /></label
+              ><label
+                >Currency<select id="budget-currency">
+                  <option>USD</option>
+                  <option>EUR</option>
+                  <option>GBP</option>
+                  <option>CAD</option>
+                  <option>AUD</option>
+                  <option>ARS</option>
+                  <option>GEL</option>
+                  <option>JPY</option>
+                  <option>VND</option>
+                  <option>THB</option>
+                  <option>Other</option></select
+                ><input
+                  id="budget-custom-currency"
+                  maxlength="3"
+                  pattern="[A-Za-z]{3}"
+                  aria-label="Three-letter currency code"
+                  placeholder="Currency code"
+                  hidden /></label
+              ><label
+                >Budget covers<select id="budget-basis">
+                  <option value="person">One person</option>
+                  <option value="couple">Both of us</option>
+                </select></label
+              ><label
+                >Budget duration (days)<input
+                  id="budget-duration"
+                  type="number"
+                  min="1"
+                  max="3650"
+                  step="1"
+                  inputmode="numeric"
+                  placeholder="e.g. 28"
+              /></label>
+            </div>
+            <p id="legacy-budget" class="helper" hidden></p>
+            <label
+              >Places & interests<input
+                id="destination-attractions"
+                maxlength="6000"
+                placeholder="Separate with commas: hiking, food, temples"
+            /></label>
+          </details>
+          <details class="editor-details">
+            <summary>Attraction gallery</summary>
+            <p class="helper">
+              Lock favorites before regenerating. Photos are saved when you save this destination.
+            </p>
+            <div class="button-row">
+              <button id="regenerate-photos" type="button">Find photos</button>
+            </div>
+            <p id="photo-status" class="helper" role="status"></p>
+            <div id="photo-gallery" class="gallery"></div>
+          </details>
+          <details class="editor-details">
+            <summary>Display options</summary>
+            <label class="check"
+              ><input id="auto-tier" type="checkbox" checked /> Choose tier automatically from
+              ratings</label
+            ><label id="manual-tier-label" hidden
+              >Manual tier<select id="manual-tier">
+                <option>S</option>
+                <option>A</option>
+                <option>B</option>
+                <option>C</option>
+                <option>D</option>
+              </select></label
+            ><label
+              >Flag image URL<input
+                id="destination-flag"
+                type="url"
+                maxlength="2048"
+                placeholder="https://…"
+            /></label>
+          </details>
+          <p id="editor-error" class="error" role="alert" hidden></p>
+        </div>
+        <footer class="editor-footer">
+          <div class="button-row">
+            <button type="button" id="delete-destination" class="danger text-button">Delete</button
+            ><button type="button" id="reset-destination" class="text-button">
+              Clear both ratings
+            </button>
+          </div>
+          <button type="submit" class="primary" id="save-destination">Save destination</button>
+        </footer>
+      </form>
+    </dialog>
+    <dialog id="confirm-dialog" aria-labelledby="confirm-title">
+      <form method="dialog" class="confirmation">
+        <h2 id="confirm-title"></h2>
+        <p id="confirm-description"></p>
+        <div class="button-row">
+          <button value="cancel">Cancel</button
+          ><button class="primary" value="confirm" id="confirm-accept">Continue</button>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="import-dialog" aria-labelledby="import-title">
+      <form id="import-form" class="confirmation">
+        <h2 id="import-title">Import your destinations</h2>
+        <p id="import-summary"></p>
+        <label
+          >How should we combine the lists?<select id="import-mode">
+            <option value="merge">Merge; imported entries replace matching names</option>
+            <option value="replace">Replace the current list</option>
+          </select></label
+        >
+        <p class="helper">A recovery point is saved before importing.</p>
+        <div class="button-row">
+          <button id="cancel-import" type="button">Cancel</button
+          ><button class="primary" type="submit">Import destinations</button>
+        </div>
+      </form>
+    </dialog>
+    <script type="module" src="/src/app.js"></script>
+  </body>
 </html>

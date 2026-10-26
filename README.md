@@ -43,13 +43,13 @@ The previous `travelTierListData` browser storage is imported on first launch on
 
 ## Repository layout
 
-| Path | Purpose |
-| --- | --- |
-| `src/` | Model, durable store, cloud transport, photos, and interface |
-| `android/` | Native Android app and Gradle wrapper |
-| `tests/` | Model/store regressions, security rules, and browser integration |
-| `firestore.rules` | Version-controlled membership and data validation rules |
-| `.github/workflows/` | Tests, preview APKs, and signed APK builds |
-| `docs/` | Installation, migration, signing, and backend setup |
+| Path                 | Purpose                                                          |
+| -------------------- | ---------------------------------------------------------------- |
+| `src/`               | Model, durable store, cloud transport, photos, and interface     |
+| `android/`           | Native Android app and Gradle wrapper                            |
+| `tests/`             | Model/store regressions, security rules, and browser integration |
+| `firestore.rules`    | Version-controlled membership and data validation rules          |
+| `.github/workflows/` | Tests, preview APKs, and signed APK builds                       |
+| `docs/`              | Installation, migration, signing, and backend setup              |
 
 No credentials, signing keys, or production exports belong in this repository. Firebase web configuration identifies the public project; the deployed rules enforce access.
