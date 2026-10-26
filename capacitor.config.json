@@ -1,0 +1,7 @@
+{
+  "appId": "com.rojamich.traveltierlist",
+  "appName": "Travel Tiers",
+  "webDir": "dist",
+  "android": { "backgroundColor": "#f6f2ea", "allowMixedContent": false },
+  "server": { "androidScheme": "https" }
+}
