@@ -34,6 +34,10 @@ npm run test:e2e
 
 See [Android build and installation](docs/ANDROID.md) and [one-time private sync setup](docs/CLOUD_SETUP.md). Installing the app does not deploy Firebase rules or grant cloud access. The app works locally without either step.
 
+## Website deployment
+
+The **Build and deploy website** workflow compiles the app and publishes `dist/` to GitHub Pages. Set repository **Settings → Pages → Source** to **GitHub Actions**. Keep the Pages source on Actions for future releases; publishing the source branch directly does not run Vite and leaves the page without working styles or scripts. The deployment checks all compiled HTML asset paths against the project's `/travel-tierlist/` URL.
+
 ## Data and synchronization
 
 `src/model.js` validates and migrates data. `src/store.js` is the storage-independent state machine. `src/storage.js` uses Android Preferences in the APK and IndexedDB on the web. Both save the list, draft, recovery points, and pending operations together before confirming a save.
