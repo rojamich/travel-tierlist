@@ -111,17 +111,19 @@
             /></label>
             <div class="button-row">
               <button class="primary" type="submit">Sign in</button
-              ><button id="register-account" type="button">Create account</button
+              ><button id="register-account" data-busy="Creating account…" type="button">
+                Create account</button
               ><button id="reset-password" class="text-button" type="button">
                 Forgot password?
               </button>
             </div>
           </form>
           <div id="account-actions" class="button-row" hidden>
-            <button id="retry-sync" class="primary">Sync now</button
+            <button id="retry-sync" data-busy="Syncing…" class="primary">Sync now</button
             ><button id="verify-email">Send verification email</button
-            ><button id="refresh-account">I’ve verified my email</button
-            ><button id="sign-out">Sign out</button>
+            ><button id="refresh-account" data-busy="Checking verification…">
+              I’ve verified my email</button
+            ><button id="sign-out" data-busy="Signing out…">Sign out</button>
           </div>
           <div id="conflicts"></div>
         </section>
@@ -132,7 +134,8 @@
           </p>
           <p class="helper" id="migration-message" hidden></p>
           <div class="button-row">
-            <button id="export-backup" class="primary">Export backup</button
+            <button id="export-backup" data-busy="Preparing backup…" class="primary">
+              Export backup</button
             ><label class="button" for="import-backup">Import backup</label
             ><input
               id="import-backup"
@@ -215,12 +218,14 @@
                 placeholder="Country, region, or special trip" /></label
             ><label
               >Trip status<select id="destination-status">
-                <option value="not-visited">Not visited</option>
-                <option value="planning">Planning</option>
+                <option value="idea">Idea</option>
+                <option value="planned">Planned</option>
                 <option value="visited">Visited</option>
+                <option value="revisit">Revisit</option>
               </select></label
             >
           </div>
+          <p id="status-help" class="helper" role="status"></p>
           <datalist id="country-options"></datalist>
           <button id="random-country" type="button">Pick a random country</button>
           <p id="destination-hint" class="helper">
@@ -349,7 +354,9 @@
               Lock favorites before regenerating. Photos are saved when you save this destination.
             </p>
             <div class="button-row">
-              <button id="regenerate-photos" type="button">Find photos</button>
+              <button id="regenerate-photos" data-busy="Finding photos…" type="button">
+                Find photos
+              </button>
             </div>
             <p id="photo-status" class="helper" role="status"></p>
             <div id="photo-gallery" class="gallery"></div>
@@ -387,6 +394,28 @@
           <button type="submit" class="primary" id="save-destination">Save destination</button>
         </footer>
       </form>
+    </dialog>
+    <dialog id="report-dialog" aria-labelledby="report-title">
+      <div class="editor">
+        <header class="editor-header">
+          <div>
+            <p class="eyebrow">BEFORE & AFTER</p>
+            <h2 id="report-title">Trip report</h2>
+          </div>
+          <button
+            type="button"
+            id="close-report"
+            class="icon-button"
+            aria-label="Close trip report"
+          >
+            ×
+          </button>
+        </header>
+        <div id="report-body" class="editor-body"></div>
+        <footer class="editor-footer">
+          <button type="button" class="primary" id="edit-report">Edit destination & ratings</button>
+        </footer>
+      </div>
     </dialog>
     <dialog id="confirm-dialog" aria-labelledby="confirm-title">
       <form method="dialog" class="confirmation">

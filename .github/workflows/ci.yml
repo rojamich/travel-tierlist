@@ -26,7 +26,7 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
       - uses: actions/upload-artifact@v4
-        if: failure()
+        if: always()
         with:
           name: test-results
           path: test-results/
@@ -55,8 +55,12 @@ jobs:
           name: travel-tiers-android-preview
           path: android/app/build/outputs/apk/debug/app-debug.apk
           retention-days: 30
+      - name: Prepare offline APK signing tool
+        run: cp "$ANDROID_HOME/build-tools/36.0.0/lib/apksigner.jar" android/app/build/outputs/apk/release/apksigner.jar
       - uses: actions/upload-artifact@v4
         with:
           name: travel-tiers-android-unsigned
-          path: android/app/build/outputs/apk/release/app-release-unsigned.apk
+          path: |
+            android/app/build/outputs/apk/release/app-release-unsigned.apk
+            android/app/build/outputs/apk/release/apksigner.jar
           retention-days: 30

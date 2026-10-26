@@ -191,7 +191,10 @@ test('conflicts retain local data until the user chooses a version', async () =>
   const { store } = await setup();
   await store.saveCountry(fixture());
   const remote = transport();
-  remote.entities.set(metaKey('japan'), { data: fixture(), revision: 'someone-else' });
+  remote.entities.set(metaKey('japan'), {
+    data: { ...fixture(), bestTime: 'April' },
+    revision: 'someone-else',
+  });
   await new SyncQueue(store, remote).flush();
   assert.equal(store.conflicts.length, 1);
   assert.equal(store.countries[0].name, 'Japan');
@@ -287,4 +290,90 @@ test('restores sync metadata before profiles so tombstones can be restored', asy
     },
   }).flush();
   assert.equal(order[0], 'meta');
+});
+
+test('identical conflicts clear automatically and retain the remote revision for later edits', async () => {
+  const { store, storage } = await setup();
+  await store.saveCountry(fixture());
+  const op = store.pending.find((op) => op.kind === 'meta');
+  await store.markConflict(op, { data: { ...op.data, _rev: 'remote' }, revision: 'remote' });
+  assert.equal(store.conflicts.length, 0);
+  assert.equal(store.entity('japan').meta.revision, 'remote');
+  const copy = await new TravelStore(storage).init();
+  assert.equal(copy.entity('japan').meta.revision, 'remote');
+  const c = copy.countries[0];
+  c.bestTime = 'May';
+  await copy.saveCountry(c, copy.entity(c.id), { meta: true, profiles: [] });
+  assert.equal(copy.pending.find((op) => op.kind === 'meta').baseRevision, 'remote');
+});
+test('snapshots reconcile matching pending metadata and profiles without losing real changes', async () => {
+  const { store } = await setup();
+  await store.saveCountry(fixture());
+  await store.acceptMetaSnapshot([{ id: 'japan', data: fixture(), revision: 'remote-meta' }]);
+  assert.equal(
+    store.pending.some((op) => op.kind === 'meta'),
+    false,
+  );
+  const mike = store.countries[0].profiles.mike;
+  await store.acceptRemote('japan', 'profile', 'mike', mike, 'remote-mike');
+  assert.equal(
+    store.pending.some((op) => op.profile === 'mike'),
+    false,
+  );
+  assert.equal(store.entity('japan').profiles.mike.revision, 'remote-mike');
+  await store.acceptRemote(
+    'japan',
+    'profile',
+    'jen',
+    { ...store.countries[0].profiles.jen, notes: 'Other device' },
+    'remote-jen',
+  );
+  assert.equal(
+    store.pending.some((op) => op.profile === 'jen'),
+    true,
+  );
+  assert.equal(store.countries[0].profiles.jen.notes, 'Jen');
+});
+test('persisted identical conflicts from earlier versions reconcile on startup', async () => {
+  const { store, storage } = await setup();
+  await store.saveCountry(fixture());
+  await store.mutate((state) => {
+    const op = state.pending[metaKey('japan')];
+    op.conflict = {
+      reason: 'changed',
+      remote: { data: clone(op.data), revision: 'already-shared' },
+    };
+  });
+  const reloaded = await new TravelStore(storage).init();
+  await reloaded.reconcileIdenticalConflicts();
+  assert.equal(reloaded.conflicts.length, 0);
+  assert.equal(reloaded.entity('japan').meta.revision, 'already-shared');
+});
+test('a conflict response for an older edit cannot attach to a newer local edit', async () => {
+  const { store } = await setup();
+  await store.saveCountry(fixture());
+  const old = clone(store.pending[0]);
+  const c = store.countries[0];
+  c.bestTime = 'New edit';
+  await store.saveCountry(c, store.entity(c.id), { meta: true, profiles: [] });
+  await store.markConflict(old, {
+    data: { ...old.data, bestTime: 'Other edit' },
+    revision: 'remote',
+  });
+  assert.equal(store.conflicts.length, 0);
+  assert.equal(store.countries[0].bestTime, 'New edit');
+});
+test('equivalent remote acknowledgments rebase edits made while uploading', async () => {
+  const { store } = await setup();
+  await store.saveCountry(fixture());
+  const old = clone(store.pending.find((op) => op.kind === 'meta'));
+  const c = store.countries[0];
+  c.bestTime = 'Next edit';
+  await store.saveCountry(c, store.entity(c.id), { meta: true, profiles: [] });
+  await store.acknowledge(old, 'equivalent-remote-revision');
+  assert.equal(
+    store.pending.find((op) => op.kind === 'meta').baseRevision,
+    'equivalent-remote-revision',
+  );
+  assert.equal(store.countries[0].bestTime, 'Next edit');
 });

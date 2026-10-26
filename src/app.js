@@ -23,7 +23,12 @@ import {
   parseBackup,
   safeUrl,
   uid,
+  STATUS_LABELS,
+  normalizeStatus,
+  hasVisited,
 } from './model.js';
+import { tripReport } from './report.js';
+import { changedFields } from './compare.js';
 import { TravelStore } from './store.js';
 import { deviceStorage, getLegacyData, getSetting, saveSetting } from './storage.js';
 import { CloudSync } from './cloud.js';
@@ -36,7 +41,7 @@ const escape = (value) =>
     (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char],
   );
 const person = (key) => (key === 'mike' ? 'Mike' : 'Jen');
-const statusLabel = { visited: 'Visited', planning: 'Planning', 'not-visited': 'Not visited' };
+const statusLabel = STATUS_LABELS;
 const number = (value) =>
   Number.isFinite(value) ? (Number.isInteger(value) ? String(value) : value.toFixed(1)) : '—';
 const date = (value) =>
@@ -56,6 +61,9 @@ let store,
 let syncState = 'local',
   syncError = null,
   pexelsKey = '';
+let reportId = null,
+  toastSequence = 0;
+const busyActions = new WeakSet();
 const filters = {
   query: '',
   view: 'average',
@@ -66,7 +74,11 @@ const filters = {
 };
 
 function toast(message) {
+  toastSequence++;
   clearTimeout(toastTimer);
+  // Keep feedback visible above whichever modal initiated the action.
+  const dialogs = [...document.querySelectorAll('dialog[open]')];
+  (dialogs.at(-1) || document.body).append($('#toast'));
   $('#toast').textContent = message;
   $('#toast').hidden = false;
   toastTimer = setTimeout(() => ($('#toast').hidden = true), 6000);
@@ -89,13 +101,40 @@ function friendlyError(error) {
     return 'Too many attempts. Wait a little before trying again.';
   return error?.message || 'Something went wrong. Your saved data has been kept.';
 }
-const guard = (callback) => async (event) => {
-  try {
-    await callback(event);
-  } catch (error) {
-    toast(friendlyError(error));
-  }
-};
+const guard =
+  (callback, success = null) =>
+  async (event) => {
+    if (event?.currentTarget === document && !event.target.closest('[data-action]')) return;
+    const button = event?.submitter || event?.target?.closest('button');
+    const owner = event?.type === 'submit' ? event.target : button;
+    if (owner && busyActions.has(owner)) {
+      event?.preventDefault();
+      return;
+    }
+    if (event) event.actionButton = button;
+    const label = button?.innerHTML;
+    const disabled = button?.disabled;
+    const sequence = toastSequence;
+    if (owner) busyActions.add(owner);
+    if (button) {
+      button.disabled = true;
+      button.setAttribute('aria-busy', 'true');
+      button.textContent = button.dataset.busy || 'Working…';
+    }
+    try {
+      const result = await callback(event);
+      if (success && result !== false && sequence === toastSequence) toast(success);
+    } catch (error) {
+      toast(friendlyError(error));
+    } finally {
+      if (owner) busyActions.delete(owner);
+      if (button) {
+        button.disabled = disabled;
+        button.removeAttribute('aria-busy');
+        button.innerHTML = label;
+      }
+    }
+  };
 function dirtyParts() {
   if (!session) return { meta: false, profiles: [] };
   const meta = (country) => {
@@ -219,8 +258,8 @@ function render() {
     (c) => rating(c, filters.view, filters.phase).score !== null,
   ).length;
   $('#overview').innerHTML = [
-    ['Visited', countries.filter((c) => c.status === 'visited').length],
-    ['Planning', countries.filter((c) => c.status === 'planning').length],
+    ['Visited', countries.filter(hasVisited).length],
+    ['Planned', countries.filter((c) => c.status === 'planned').length],
     ['Destinations', countries.length],
     ['Rated', ranked],
   ]
@@ -258,7 +297,8 @@ function render() {
             ? entries
                 .map((country) => {
                   const r = rating(country, filters.view, filters.phase);
-                  return `<button class="tier-pill" data-action="edit" data-id="${escape(country.id)}" aria-label="Edit ${escape(country.name)}"><span class="pill-name">${country.flagUrl ? `<img src="${escape(country.flagUrl)}" alt="" loading="lazy" />` : ''}${escape(country.name)}${r.score !== null ? ` <strong>${number(r.score)}</strong>` : ''}</span><small>${statusLabel[country.status]} · ${r.count}/2 rated</small></button>`;
+                  const complete = tripReport(country).complete;
+                  return `<button class="tier-pill" data-action="open" data-id="${escape(country.id)}" aria-label="${complete ? 'Report for' : 'Edit'} ${escape(country.name)}"><span class="pill-name">${country.flagUrl ? `<img src="${escape(country.flagUrl)}" alt="" loading="lazy" />` : ''}${escape(country.name)}${r.score !== null ? ` <strong>${number(r.score)}</strong>` : ''}</span><small>${statusLabel[country.status]} · ${complete ? 'Report ready' : `${r.count}/2 rated`}</small></button>`;
                 })
                 .join('')
             : '<p class="subtle">Room for a new favorite.</p>'
@@ -269,13 +309,14 @@ function render() {
         .map((country) => {
           const r = rating(country, filters.view, filters.phase);
           const notes = notesMarkup(country);
-          return `<article class="country-card tier-${r.tier}"><header><div><h2>${escape(country.name)}</h2><span class="tag">${statusLabel[country.status]}${country.custom ? ' · Custom' : ''}</span></div><button data-action="edit" data-id="${escape(country.id)}" aria-label="Edit ${escape(country.name)}">Edit</button></header><div class="score-line"><span class="tag">${r.tier === 'unranked' ? 'Unranked' : `Tier ${r.tier}`}</span><div><strong>${r.score === null ? 'Not scored' : `${number(r.score)} / 25`}</strong><br /><small>${scoreDescription(r)}<br />Mike ${number(r.mike)} · Jen ${number(r.jen)}${r.disagreement !== null ? ` · Difference ${number(r.disagreement)}` : ''}</small></div></div><dl><div><dt>Best time</dt><dd>${escape(country.bestTime || 'Still exploring')}</dd></div><div><dt>Time needed</dt><dd>${escape(country.days || 'Not set')}</dd></div><div><dt>Budget</dt><dd>${escape(budgetText(country.budget))}</dd></div><div><dt>Interests</dt><dd>${escape(country.attractions.join(', ') || 'Add your highlights')}</dd></div></dl>${notes ? `<details><summary>Your notes</summary>${notes}</details>` : ''}</article>`;
+          return `<article class="country-card tier-${r.tier}"><header><div><h2><button class="destination-title" data-action="open" data-id="${escape(country.id)}">${escape(country.name)}</button></h2><span class="tag">${statusLabel[country.status]}${country.custom ? ' · Custom' : ''}</span></div><button data-action="edit" data-id="${escape(country.id)}" aria-label="Edit ${escape(country.name)}">Edit</button></header><div class="score-line"><span class="tag">${r.tier === 'unranked' ? 'Unranked' : `Tier ${r.tier}`}</span><div><strong>${r.score === null ? 'Not scored' : `${number(r.score)} / 25`}</strong><br /><small>${scoreDescription(r)}<br />Mike ${number(r.mike)} · Jen ${number(r.jen)}${r.disagreement !== null ? ` · Difference ${number(r.disagreement)}` : ''}</small></div></div><button data-action="report" data-id="${escape(country.id)}">${tripReport(country).complete ? 'View trip report' : 'Compare ratings'}</button><dl><div><dt>Best time</dt><dd>${escape(country.bestTime || 'Still exploring')}</dd></div><div><dt>Time needed</dt><dd>${escape(country.days || 'Not set')}</dd></div><div><dt>Budget</dt><dd>${escape(budgetText(country.budget))}</dd></div><div><dt>Interests</dt><dd>${escape(country.attractions.join(', ') || 'Add your highlights')}</dd></div></dl>${notes ? `<details><summary>Your notes</summary>${notes}</details>` : ''}</article>`;
         })
         .join('')
     : emptyMarkup(Boolean(countries.length));
   $('#draft-banner').hidden = !store.state.draft || Boolean(session);
   updateConnection();
   if (page === 'settings') renderSettings();
+  if (reportId) renderReport();
 }
 
 function updateConnection() {
@@ -325,7 +366,8 @@ function renderSettings() {
   $('#conflicts').innerHTML = store.conflicts
     .map((op) => {
       const name = store.entity(op.countryId).meta?.data.name || op.countryId;
-      return `<div class="conflict-row"><div><strong>${escape(name)} · ${op.kind === 'meta' ? 'Trip details' : `${person(op.profile)}’s profile`}</strong><small>${op.conflict.reason === 'deleted-country' ? 'This destination was deleted on another device.' : 'Choose which version to keep. A recovery point will preserve your local copy.'}</small><details><summary>Compare versions</summary><p class="helper">This device</p><div class="conflict-detail">${comparison(op.data, op.kind)}</div><p class="helper">Shared list</p><div class="conflict-detail">${comparison(op.conflict.remote?.data, op.kind)}</div></details></div><div class="button-row"><button data-action="conflict-remote" data-key="${escape(op.key)}">Use shared version</button>${op.conflict.reason !== 'deleted-country' ? `<button data-action="conflict-local" data-key="${escape(op.key)}">Keep this device’s version</button>` : ''}</div></div>`;
+      const differences = changedFields(op.data, op.conflict.remote?.data, op.kind);
+      return `<div class="conflict-row"><div><strong>${escape(name)} · ${op.kind === 'meta' ? 'Trip details' : `${person(op.profile)}’s profile`}</strong><small>${op.conflict.reason === 'deleted-country' ? 'This destination was deleted on another device.' : `${differences.length} changed ${differences.length === 1 ? 'field' : 'fields'}. Choose the version to keep; your local copy is preserved in recovery.`}</small><details open><summary>Changed fields only</summary><div class="conflict-changes">${differences.map((row) => `<section><h4>${escape(row.label)}</h4><p><b>This device:</b> ${escape(row.local || 'Empty')}</p><p><b>Shared list:</b> ${escape(row.remote || 'Empty')}</p></section>`).join('') || (op.conflict.reason === 'deleted-country' ? '<p>The shared destination was deleted. Its profile values may still match your copy.</p>' : '<p>The content matches. Checking the shared version…</p>')}</div></details></div><div class="button-row"><button data-action="conflict-remote" data-key="${escape(op.key)}">Use shared version</button>${op.conflict.reason !== 'deleted-country' ? `<button data-action="conflict-local" data-key="${escape(op.key)}">Keep this device’s version</button>` : ''}</div></div>`;
     })
     .join('');
   $('#recovery-points').innerHTML = store.state.history.length
@@ -333,30 +375,43 @@ function renderSettings() {
     : '<p class="helper">Recovery points appear here after imports, resets, or deletions.</p>';
 }
 
-function comparison(data, kind) {
-  if (!data) return 'No saved version.';
-  const lines =
-    kind === 'meta'
-      ? [
-          ['Destination', data.name],
-          ['Status', data.deleted ? 'Deleted' : statusLabel[data.status]],
-          ['Best time', data.bestTime],
-          ['Time needed', data.days],
-          ['Budget', budgetText(data.budget)],
-          ['Interests', data.attractions.join(', ')],
-          ['Photos', `${data.images.length} saved`],
-        ]
-      : [
-          ['Before-trip rating', `${number(phaseTotal(data.expected))} / 25`],
-          ['After-trip rating', `${number(phaseTotal(data.experienced))} / 25`],
-          ['Notes', data.notes],
-          ['Before-you-go notes', data.preNotes],
-          ['After-the-trip notes', data.postNotes],
-        ];
-  return lines
-    .filter(([, value]) => value)
-    .map(([label, value]) => `<p><strong>${label}:</strong> ${escape(value)}</p>`)
-    .join('');
+const delta = (value) =>
+  value === null
+    ? '—'
+    : value === 0
+      ? 'No change'
+      : `${value > 0 ? '+' : '−'}${number(Math.abs(value))}`;
+function openDestination(id) {
+  const country = store.countries.find((c) => c.id === id);
+  if (!country) return;
+  if (tripReport(country).complete) openReport(id);
+  else openEditor(id);
+}
+function openReport(id) {
+  reportId = id;
+  renderReport();
+  $('#report-dialog').showModal();
+}
+function renderReport() {
+  const country = store.countries.find((c) => c.id === reportId);
+  if (!country) {
+    $('#report-dialog').close();
+    reportId = null;
+    return;
+  }
+  const report = tripReport(country);
+  $('#report-title').textContent = `${country.name} · Trip report`;
+  $('#report-body').innerHTML = `
+    <span class="tag">${statusLabel[country.status]}</span>
+    <p class="helper">${report.complete ? 'Both perspectives, before and after your trip.' : 'Report in progress. Missing ratings stay blank and never count as zero.'}</p>
+    ${!hasVisited(country) ? '<p class="helper">Mark this destination Visited after your trip to complete its report.</p>' : ''}
+    ${report.missing.length ? `<div class="report-missing"><h3>Still to rate</h3>${report.missing.map(({ person: key, phase }) => `<button data-action="report-rate" data-id="${escape(country.id)}" data-profile-key="${key}" data-phase-key="${phase}">${person(key)} · ${phase === 'expected' ? 'Before the trip' : 'After the trip'}</button>`).join('')}</div>` : ''}
+    <section class="report-summary"><h3>Our average</h3><div class="report-totals"><p><small>Before</small><strong>${number(report.before.score)} / 25</strong><small>${report.before.count}/2 rated · ${report.before.count ? `Tier ${tierFor(report.before.score)}` : 'Unranked'}</small></p><p><small>After</small><strong>${number(report.after.score)} / 25</strong><small>${report.after.count}/2 rated · ${report.after.count ? `Tier ${tierFor(report.after.score)}` : 'Unranked'}</small></p><p><small>Change</small><strong>${delta(report.change)}</strong><small>After minus before</small></p></div><p class="helper">Difference between Mike and Jen: before ${number(report.before.disagreement)} · after ${number(report.after.disagreement)} points.</p></section>
+    ${PROFILE_KEYS.map((key) => {
+      const p = report.people[key];
+      return `<section class="person-report ${key}"><h3>${person(key)}</h3><p>Before <b>${number(p.before)} / 25</b> → After <b>${number(p.after)} / 25</b> · ${delta(p.change)}</p><table><caption>${person(key)}’s ratings, from 1 to 5</caption><thead><tr><th scope="col">Category</th><th scope="col">Before</th><th scope="col">After</th><th scope="col">Change</th></tr></thead><tbody>${p.categories.map((r) => `<tr><th scope="row">${SCORE_LABELS[r.field]}</th><td>${number(r.before)}</td><td>${number(r.after)}</td><td>${delta(r.change)}</td></tr>`).join('')}</tbody></table>${PHASES.some((phase) => country.profiles[key][phase].legacyTotal !== null) ? '<p class="helper">Imported totals may have no category scores. Missing category scores are shown as —.</p>' : ''}</section>`;
+    }).join('')}
+    <section><h3>In your own words</h3>${notesMarkup(country) || '<p class="helper">No notes saved yet.</p>'}</section>`;
 }
 
 const choices = {
@@ -422,6 +477,8 @@ function openEditor(id = null, profile = 'mike', draft = null) {
         isNew: !id,
       };
   session.token = uid();
+  session.country.status = normalizeStatus(session.country.status);
+  session.initial.status = normalizeStatus(session.initial.status);
   photoIndex = 0;
   fillEditor();
   $('#editor-error').hidden = true;
@@ -433,7 +490,8 @@ function fillEditor() {
   $('#dialog-title').textContent = session.isNew ? 'Add destination' : c.name;
   $('#random-country').hidden = !session.isNew;
   $('#destination-name').value = c.name;
-  $('#destination-status').value = c.status;
+  $('#destination-status').value = normalizeStatus(c.status);
+  updateStatusHelp();
   $('#destination-season').value = c.bestTime;
   $('#destination-days').value = c.days;
   $('#budget-amount').value = c.budget.amount ?? '';
@@ -553,12 +611,18 @@ function scheduleDraft() {
 }
 async function closeEditor({ discard = false } = {}) {
   if (!session) return;
+  if ($('#save-destination').disabled) {
+    toast('Saving your destination. Please wait…');
+    return;
+  }
   photoRequest?.abort();
   photoRequest = null;
   clearTimeout(draftTimer);
   collectEditor();
-  if (!discard && hasChanges()) await store.saveDraft(session);
-  else await store.clearDraft();
+  if (!discard && hasChanges()) {
+    await store.saveDraft(session);
+    toast('Draft saved on this device. Continue editing from the banner.');
+  } else await store.clearDraft();
   session = null;
   $('#country-dialog').close();
   render();
@@ -638,6 +702,7 @@ async function exportFile(data, filename) {
       url: result.uri,
       dialogTitle: 'Save your travel backup',
     });
+    toast('Backup prepared for sharing.');
   } else {
     const url = URL.createObjectURL(new Blob([content], { type: 'application/json' }));
     const link = document.createElement('a');
@@ -645,10 +710,29 @@ async function exportFile(data, filename) {
     link.download = filename;
     link.click();
     setTimeout(() => URL.revokeObjectURL(url), 30000);
+    toast('Backup download started.');
   }
 }
 
+function updateStatusHelp() {
+  $('#status-help').textContent = {
+    idea: 'Just an idea. Research and before-trip ratings can come later.',
+    planned: 'Researched and booked. Add your expectations before you go.',
+    visited: 'Trip completed. Rate your actual experience and compare it with your expectations.',
+    revisit: 'A place you may return to. Your previous trip ratings and report stay available.',
+  }[$('#destination-status').value];
+}
 function bindEvents() {
+  $('#close-report').addEventListener('click', () => $('#report-dialog').close());
+  $('#report-dialog').addEventListener('close', () => {
+    reportId = null;
+  });
+  $('#edit-report').addEventListener('click', () => {
+    const id = reportId;
+    $('#report-dialog').close();
+    reportId = null;
+    openEditor(id);
+  });
   $('#toggle-tier-only').addEventListener('click', () => setTierOnly(true));
   $('#exit-tier-only').addEventListener('click', () => setTierOnly(false));
   document.addEventListener('keydown', (event) => {
@@ -670,10 +754,19 @@ function bindEvents() {
   document.addEventListener(
     'click',
     guard(async (event) => {
-      const button = event.target.closest('[data-action]');
+      const button = event.actionButton;
       if (!button) return;
       const action = button.dataset.action;
       if (action === 'add') openEditor();
+      if (action === 'open') openDestination(button.dataset.id);
+      if (action === 'report') openReport(button.dataset.id);
+      if (action === 'report-rate') {
+        $('#report-dialog').close();
+        reportId = null;
+        openEditor(button.dataset.id, button.dataset.profileKey);
+        session.phase = button.dataset.phaseKey;
+        renderProfile();
+      }
       if (action === 'edit') openEditor(button.dataset.id);
       if (action === 'queue-edit') openEditor(button.dataset.id, button.dataset.profileKey);
       if (action === 'rank-next') {
@@ -699,17 +792,23 @@ function bindEvents() {
         toast('List restored on this device.');
       }
       if (action === 'conflict-remote' || action === 'conflict-local')
-        await store.resolveConflict(
-          button.dataset.key,
-          action === 'conflict-remote' ? 'remote' : 'local',
-        );
-    }),
+        await store
+          .resolveConflict(button.dataset.key, action === 'conflict-remote' ? 'remote' : 'local')
+          .then(() =>
+            toast(
+              action === 'conflict-remote'
+                ? 'Shared version kept on this device.'
+                : 'Device version kept. Waiting to upload.',
+            ),
+          );
+    }, null),
   );
   for (const type of ['input', 'change'])
     form.addEventListener(type, (event) => {
       collectEditor(event.target);
       if (type === 'change' && event.target.id === 'destination-status') {
         session.phase = ratingPhase(session.country);
+        updateStatusHelp();
         renderProfile();
       }
       scheduleDraft();
@@ -737,7 +836,14 @@ function bindEvents() {
     clearTimeout(draftTimer);
     collectEditor();
     $('#editor-error').hidden = true;
+    if ($('#save-destination').disabled) return;
     $('#save-destination').disabled = true;
+    $('#save-destination').textContent = 'Saving…';
+    $('#save-destination').setAttribute('aria-busy', 'true');
+    const controls = [...form.elements]
+      .filter((control) => control.id !== 'save-destination')
+      .map((control) => [control, control.disabled]);
+    for (const [control] of controls) control.disabled = true;
     try {
       const flag = $('#destination-flag').value;
       if (flag && !safeUrl(flag)) throw new Error('Use an HTTPS URL for the flag image.');
@@ -761,12 +867,19 @@ function bindEvents() {
       session = null;
       $('#country-dialog').close();
       render();
-      toast('Saved on this device.');
+      toast(
+        cloud.user
+          ? 'Saved on this device. ' + $('#sync-message').textContent
+          : 'Saved on this device.',
+      );
     } catch (error) {
       $('#editor-error').textContent = friendlyError(error);
       $('#editor-error').hidden = false;
     } finally {
       $('#save-destination').disabled = false;
+      $('#save-destination').textContent = 'Save destination';
+      $('#save-destination').removeAttribute('aria-busy');
+      for (const [control, wasDisabled] of controls) control.disabled = wasDisabled;
     }
   });
   $('#close-editor').addEventListener(
@@ -789,8 +902,9 @@ function bindEvents() {
     };
     renderProfile();
     scheduleDraft();
+    toast('Scores cleared in this draft. Save destination to keep the change.');
   });
-  $('#regenerate-photos').addEventListener('click', guard(regeneratePhotos));
+  $('#regenerate-photos').addEventListener('click', guard(regeneratePhotos, null));
   $('#delete-destination').addEventListener(
     'click',
     guard(async () => {
@@ -838,6 +952,7 @@ function bindEvents() {
     guard(async () => {
       await store.clearDraft();
       render();
+      toast('Draft discarded.');
     }),
   );
   $('#connection-button').addEventListener('click', () => {
@@ -849,6 +964,7 @@ function bindEvents() {
       event.preventDefault();
       await cloud.signIn($('#auth-email').value, $('#auth-password').value);
       $('#auth-password').value = '';
+      toast('Signed in. ' + $('#sync-message').textContent);
     }),
   );
   $('#register-account').addEventListener(
@@ -884,11 +1000,21 @@ function bindEvents() {
   );
   $('#refresh-account').addEventListener(
     'click',
-    guard(() => cloud.refreshUser()),
+    guard(async () => {
+      await cloud.refreshUser();
+      toast(
+        cloud.user?.emailVerified
+          ? 'Email verified. Connecting to your shared list…'
+          : 'Your email is still waiting for verification.',
+      );
+    }),
   );
   $('#retry-sync').addEventListener(
     'click',
-    guard(() => cloud.retry()),
+    guard(async () => {
+      await cloud.retry();
+      toast($('#sync-message').textContent);
+    }, null),
   );
   $('#export-backup').addEventListener(
     'click',
@@ -996,6 +1122,7 @@ function bindEvents() {
     void App.addListener('backButton', () => {
       if ($('#confirm-dialog').open) $('#confirm-dialog').close('cancel');
       else if ($('#import-dialog').open) $('#import-dialog').close();
+      else if ($('#report-dialog').open) $('#report-dialog').close();
       else if (session) void closeEditor().catch((error) => toast(friendlyError(error)));
       else if (document.body.classList.contains('tier-only')) setTierOnly(false);
       else if (page !== 'board') location.hash = 'board';
@@ -1054,6 +1181,7 @@ async function setupInstall() {
 
 async function init() {
   store = await new TravelStore(deviceStorage).init(await getLegacyData());
+  await store.reconcileIdenticalConflicts();
   pexelsKey = (await getSetting('pexelsApiKey')) || '';
   $('#pexels-key').value = pexelsKey;
   $('#country-options').innerHTML = window.ALL_COUNTRIES.map(

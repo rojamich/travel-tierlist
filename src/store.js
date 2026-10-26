@@ -9,6 +9,7 @@ import {
   exportBackup,
   isDestinationId,
 } from './model.js';
+import { sameContent } from './compare.js';
 
 const blankState = () => ({
   version: 3,
@@ -65,7 +66,7 @@ function project(records) {
     .filter(([, entry]) => entry.meta && !entry.meta.data.deleted)
     .map(([id, entry]) => ({
       id,
-      ...clone(entry.meta.data),
+      ...cleanMeta(entry.meta.data),
       profiles: Object.fromEntries(
         PROFILE_KEYS.map((key) => [
           key,
@@ -276,7 +277,15 @@ export class TravelStore {
     };
     const normalized = kind === 'meta' ? cleanMeta(data) : cleanProfile(data);
     await this.mutate((state) => {
-      if (state.pending[operation.key]) return;
+      const pending = state.pending[operation.key];
+      if (pending) {
+        if (!sameContent(pending.data, normalized, kind)) {
+          if (pending.conflict)
+            pending.conflict.remote = { data: normalized, revision: revision || null };
+          return;
+        }
+        delete state.pending[operation.key];
+      }
       writeEntity(state, operation, { data: normalized, revision: revision || null });
     });
   }
@@ -298,7 +307,6 @@ export class TravelStore {
           state.migrationWarnings = (state.migrationWarnings || 0) + 1;
           continue;
         }
-        if (state.pending[metaKey(doc.id)]) continue;
         let meta;
         try {
           meta = cleanMeta(doc.data);
@@ -307,6 +315,15 @@ export class TravelStore {
             (item) => !item.data.name,
           ).length;
           continue;
+        }
+        const pending = state.pending[metaKey(doc.id)];
+        if (pending) {
+          if (!sameContent(pending.data, meta, 'meta')) {
+            if (pending.conflict)
+              pending.conflict.remote = { data: meta, revision: doc.revision || null };
+            continue;
+          }
+          delete state.pending[metaKey(doc.id)];
         }
         const entry = (state.records[doc.id] ||= emptyEntry());
         entry.meta = { data: meta, revision: doc.revision || null };
@@ -324,13 +341,16 @@ export class TravelStore {
       }
     });
   }
-  async acknowledge(operation) {
+  async acknowledge(operation, revision = operation.revision) {
     await this.mutate((state) => {
       const current = state.pending[operation.key];
       if (!current) return;
-      if (current.revision === operation.revision) delete state.pending[operation.key];
-      else {
-        current.baseRevision = operation.revision;
+      if (current.revision === operation.revision) {
+        delete state.pending[operation.key];
+        const entity = readEntity(state, operation);
+        if (entity?.revision === operation.revision) entity.revision = revision;
+      } else {
+        current.baseRevision = revision;
         current.conflict = null;
       }
     });
@@ -338,7 +358,16 @@ export class TravelStore {
   async markConflict(operation, remote, reason = 'changed') {
     await this.mutate((state) => {
       const current = state.pending[operation.key];
-      if (current) current.conflict = { remote: clone(remote), reason };
+      if (current && current.revision === operation.revision) {
+        if (
+          reason !== 'deleted-country' &&
+          remote &&
+          sameContent(current.data, remote.data, current.kind)
+        ) {
+          writeEntity(state, current, clone(remote));
+          delete state.pending[operation.key];
+        } else current.conflict = { remote: clone(remote), reason };
+      }
     });
   }
   async resolveConflict(key, choice) {
@@ -365,6 +394,30 @@ export class TravelStore {
           data: clone(operation.data),
           revision: operation.revision,
         });
+      }
+    });
+  }
+  async reconcileIdenticalConflicts() {
+    if (
+      !this.conflicts.some(
+        (op) =>
+          op.conflict.reason !== 'deleted-country' &&
+          op.conflict.remote &&
+          sameContent(op.data, op.conflict.remote.data, op.kind),
+      )
+    )
+      return;
+    await this.mutate((state) => {
+      for (const op of Object.values(state.pending)) {
+        const remote = op.conflict?.remote;
+        if (
+          remote &&
+          op.conflict.reason !== 'deleted-country' &&
+          sameContent(op.data, remote.data, op.kind)
+        ) {
+          writeEntity(state, op, clone(remote));
+          delete state.pending[op.key];
+        }
       }
     });
   }
@@ -395,7 +448,7 @@ export class SyncQueue {
         try {
           const result = await this.transport.commit(clone(next));
           if (result.conflict) await this.store.markConflict(next, result.remote, result.reason);
-          else await this.store.acknowledge(next);
+          else await this.store.acknowledge(next, result.revision ?? next.revision);
         } catch (error) {
           this.onStatus('error', error);
           return;

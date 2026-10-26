@@ -650,6 +650,84 @@ dd {
   width: max-content;
   font-size: 0.85rem;
 }
+button[aria-busy='true'] {
+  cursor: progress;
+  opacity: 0.8;
+}
+button:active,
+.button:active {
+  transform: translateY(1px);
+}
+.destination-title {
+  padding: 0;
+  min-height: 44px;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+}
+.report-totals {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.report-totals p {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+}
+.report-totals small {
+  color: var(--muted);
+}
+.report-totals strong {
+  font-size: clamp(1rem, 3vw, 1.4rem);
+  overflow-wrap: anywhere;
+}
+.report-summary,
+.person-report,
+.report-missing {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--line);
+}
+.report-missing button {
+  margin: 4px;
+}
+.person-report table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+.person-report caption {
+  text-align: left;
+  color: var(--muted);
+  padding-bottom: 8px;
+}
+.person-report th,
+.person-report td {
+  padding: 9px 4px;
+  border-bottom: 1px solid var(--line);
+  text-align: center;
+}
+.person-report th:first-child {
+  text-align: left;
+  width: 40%;
+}
+.person-report h3 {
+  color: var(--green);
+}
+.conflict-changes section {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+.conflict-changes h4,
+.conflict-changes p {
+  margin: 5px 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+#report-body .notes-block p {
+  white-space: pre-wrap;
+}
 .banner {
   padding: 10px 22px;
   background: #e8dfc6;

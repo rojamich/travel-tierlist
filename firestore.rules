@@ -3,7 +3,8 @@ service cloud.firestore {
   match /databases/{database}/documents {
     function member() {
       return request.auth != null && request.auth.token.email_verified == true
-        && exists(/databases/$(database)/documents/members/$(request.auth.uid));
+        && exists(/databases/$(database)/documents/members/$(request.auth.uid))
+        && get(/databases/$(database)/documents/members/$(request.auth.uid)).data.granted == true;
     }
     function bounded(value, size) { return value is string && value.size() <= size; }
     function score(value) { return value == null || (value is int && value >= 1 && value <= 5); }
@@ -35,7 +36,7 @@ service cloud.firestore {
     function destination(data) {
       return data.keys().hasAll(['name','status','bestTime','days','budget','manualTier','flagUrl','images','attractions','custom','deleted','schemaVersion','_rev','updatedAt'])
         && data.keys().hasOnly(['name','status','bestTime','days','budget','manualTier','flagUrl','images','attractions','custom','deleted','schemaVersion','_rev','updatedAt'])
-        && bounded(data.name,100) && data.name.size()>0 && data.status in ['visited','planning','not-visited']
+        && bounded(data.name,100) && data.name.size()>0 && data.status in ['idea','planned','visited','revisit','planning','not-visited']
         && bounded(data.bestTime,500) && bounded(data.days,500) && budget(data.budget)
         && (data.manualTier == null || data.manualTier in ['S','A','B','C','D'])
         && https(data.flagUrl) && images(data.images) && data.attractions is list && data.attractions.size()<=30
