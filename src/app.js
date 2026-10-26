@@ -335,6 +335,10 @@ function updateConnection() {
   };
   const state = !navigator.onLine ? 'offline' : conflicts ? 'conflict' : syncState;
   $('#connection-label').textContent = labels[state] || labels.local;
+  $('#connection-button').setAttribute(
+    'aria-label',
+    'Open sync settings: ' + $('#connection-label').textContent,
+  );
   $('#connection-button').dataset.state = state;
   const messages = {
     local: 'Your list is saved on this device. Sign in to share it across your phones.',

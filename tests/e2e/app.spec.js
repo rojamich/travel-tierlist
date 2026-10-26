@@ -276,6 +276,7 @@ test('completed destinations open reports automatically with both people and bef
   await save(page);
   await page.getByRole('button', { name: 'Report for Japan', exact: true }).click();
   await expect(page.locator('#report-dialog')).toBeVisible();
+  await expect(page.locator('#edit-report')).toBeInViewport({ ratio: 1 });
   await expect(page.locator('#report-body')).toContainText('Both perspectives');
   await expect(page.locator('.report-summary')).toContainText('22.5 / 25');
   await expect(page.locator('.report-summary')).toContainText('+2.5');
