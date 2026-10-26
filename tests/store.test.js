@@ -95,3 +95,15 @@ test('drafts are saved independently from committed destinations',async()=>{
 test('account changes cannot silently upload a previous account’s local copy',async()=>{
   const {store}=await setup();await store.claimSyncOwner('mike');await assert.rejects(()=>store.claimSyncOwner('someone-else'),/another account/);
 });
+test('an intentional device clear does not reimport old browser storage',async()=>{
+  const storage=memory();const store=await new TravelStore(storage).init([fixture()]);await store.clearDevice();
+  const reloaded=await new TravelStore(storage).init([fixture()]);assert.equal(reloaded.countries.length,0);
+});
+test('malformed legacy entries are archived without blocking valid destinations',async()=>{
+  const storage=memory();const store=await new TravelStore(storage).init([fixture(),{broken:true}]);
+  assert.equal(store.countries.length,1);assert.equal(store.state.legacyArchive.length,2);assert.equal(store.state.migrationWarnings,1);
+});
+test('restores sync metadata before profiles so tombstones can be restored',async()=>{
+  const {store}=await setup();await store.saveCountry(fixture());const order=[];
+  await new SyncQueue(store,{async commit(op){order.push(op.kind);return {ok:true};}}).flush();assert.equal(order[0],'meta');
+});

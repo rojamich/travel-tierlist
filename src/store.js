@@ -39,13 +39,16 @@ function project(records) {
 export class TravelStore {
   constructor(storage) { this.storage = storage; this.state = blankState(); this.listeners = new Set(); this.tail = Promise.resolve(); }
   async init(legacy) {
-    this.state = await this.storage.load() || blankState();
+    const saved = await this.storage.load();
+    this.state = saved || blankState();
     if (this.state.version !== 3) throw new Error('This data was made by a newer app. Update Travel Tiers before opening it.');
-    if (!Object.keys(this.state.records).length && Array.isArray(legacy) && legacy.length) {
-      const converted = legacy.map(migrateCountry);
+    if (!saved && Array.isArray(legacy) && legacy.length) {
+      const converted = [];
+      for(const country of legacy) {try{converted.push(migrateCountry(country));}catch{/* Preserve unconvertible entries in the original archive below. */}}
       await this.importCountries(converted, 'merge', 'Before importing the previous app');
-      await this.mutate(state => { state.legacyArchive = clone(legacy); });
+      await this.mutate(state => { state.legacyArchive = clone(legacy);state.migrationWarnings=legacy.length-converted.length; });
     }
+    if(!saved)await this.storage.save(this.state);
     return this;
   }
   subscribe(listener) { this.listeners.add(listener); return () => this.listeners.delete(listener); }
@@ -149,6 +152,11 @@ export class TravelStore {
   }
   async acceptMetaSnapshot(documents) {
     await this.mutate(state => {
+      const oldDocuments=documents.filter(doc=>doc.data.schemaVersion!==3);
+      if(oldDocuments.length){
+        const archive=state.legacyCloudArchive ||= [];
+        for(const doc of oldDocuments)if(!archive.some(item=>item.id===doc.id))archive.push(clone(doc));
+      }
       const remoteIds = new Set(documents.map(doc => doc.id));
       for (const [id,entry] of Object.entries(state.records)) {
         const hasPending = Object.values(state.pending).some(op=>op.countryId===id);
@@ -156,7 +164,8 @@ export class TravelStore {
       }
       for (const doc of documents) {
         if (state.pending[metaKey(doc.id)]) continue;
-        const meta = cleanMeta(doc.data);
+        let meta;
+        try{meta=cleanMeta(doc.data);}catch{state.migrationWarnings=(state.legacyCloudArchive||[]).filter(item=>!item.data.name).length;continue;}
         const entry = state.records[doc.id] ||= emptyEntry();
         entry.meta = { data:meta,revision:doc.revision || null };
         if (doc.data.schemaVersion !== 3) {

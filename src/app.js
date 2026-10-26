@@ -93,6 +93,7 @@ function render() {
   $('#overview').innerHTML=[['Visited',countries.filter(c=>c.status==='visited').length],['Planning',countries.filter(c=>c.status==='planning').length],['Destinations',countries.length],['Rated',ranked]].map(([label,value])=>`<div class="stat"><strong>${value}</strong><span>${label}</span></div>`).join('');
   $('#queue-summary').textContent=countries.length?`${queue.neither.length} ${queue.neither.length===1?'destination needs':'destinations need'} both of your ratings. The queue includes destinations neither of you has rated.`:'Start a list together, then come back to compare your ratings.';
   $('#queue-actions').innerHTML=PROFILE_KEYS.map(key=>`<button data-action="rank-next" data-profile-key="${key}" ${queue[key].length?'':'disabled'}>Rank next for ${person(key)}<small>${queue[key].length?`${queue[key].length} still to rate`:'All caught up'}</small></button>`).join('');
+  $('#rating-queues').innerHTML=`<summary>See who still needs to rate</summary><div class="rating-queue-lists">${[['neither','Neither rated'],['mike','Needs Mike'],['jen','Needs Jen']].map(([key,label])=>`<section><h3>${label} · ${queue[key].length}</h3>${queue[key].length?queue[key].map(country=>`<button data-action="queue-edit" data-id="${escape(country.id)}" data-profile-key="${key==='jen'?'jen':'mike'}">${escape(country.name)}</button>`).join(''):'<p class="helper">All caught up.</p>'}</section>`).join('')}</div>`;
   $('#result-count').textContent=`${displayed.length} of ${countries.length} destinations`;
   $('#tier-board').innerHTML=!displayed.length?emptyMarkup(Boolean(countries.length)):TIERS.map(tier=>{
     const entries=displayed.filter(c=>rating(c,filters.view,filters.phase).tier===tier);
@@ -125,7 +126,9 @@ function renderSettings() {
   $('#account-label').textContent=user?`Signed in as ${user.email}`:'';
   $('#verify-email').hidden=!user||user.emailVerified;$('#refresh-account').hidden=!user||user.emailVerified;
   $('#retry-sync').hidden=Boolean(user&&!user.emailVerified);
-  $('#export-legacy').hidden=!store.state.legacyArchive;
+  $('#export-legacy').hidden=!store.state.legacyArchive&&!store.state.legacyCloudArchive;
+  $('#migration-message').hidden=!store.state.migrationWarnings;
+  $('#migration-message').textContent=`${store.state.migrationWarnings||0} older entries could not be converted. Export the original data to keep a copy for recovery.`;
   $('#conflicts').innerHTML=store.conflicts.map(op=>{
     const name=store.entity(op.countryId).meta?.data.name||op.countryId;
     return `<div class="conflict-row"><div><strong>${escape(name)} · ${op.kind==='meta'?'Trip details':`${person(op.profile)}’s profile`}</strong><small>${op.conflict.reason==='deleted-country'?'This destination was deleted on another device.':'Choose which version to keep. A recovery point will preserve your local copy.'}</small><details><summary>Compare versions</summary><p class="helper">This device</p><div class="conflict-detail">${comparison(op.data,op.kind)}</div><p class="helper">Shared list</p><div class="conflict-detail">${comparison(op.conflict.remote?.data,op.kind)}</div></details></div><div class="button-row"><button data-action="conflict-remote" data-key="${escape(op.key)}">Use shared version</button>${op.conflict.reason!=='deleted-country'?`<button data-action="conflict-local" data-key="${escape(op.key)}">Keep this device’s version</button>`:''}</div></div>`;
@@ -255,6 +258,7 @@ function bindEvents() {
     const action=button.dataset.action;
     if(action==='add')openEditor();
     if(action==='edit')openEditor(button.dataset.id);
+    if(action==='queue-edit')openEditor(button.dataset.id,button.dataset.profileKey);
     if(action==='rank-next') {const key=button.dataset.profileKey;const next=rankingQueue(store.countries,filters.phase)[key][0];if(next)openEditor(next.id,key);}
     if(action==='reset-filters') {Object.assign(filters,{query:'',status:'all',tier:'all',sort:'name'});$('#search').value='';for(const key of ['status','tier','sort'])$(`#filter-${key}`).value=filters[key];render();}
     if(action==='restore'&&await confirmAction('Restore this recovery point?','This will replace the current list. A new recovery point will preserve your current data.','Restore list')) {await store.restore(button.dataset.id);toast('List restored on this device.');}
@@ -304,7 +308,7 @@ function bindEvents() {
   $('#refresh-account').addEventListener('click',guard(()=>cloud.refreshUser()));
   $('#retry-sync').addEventListener('click',guard(()=>cloud.retry()));
   $('#export-backup').addEventListener('click',guard(()=>exportFile(store.export(),`travel-tiers-${new Date().toISOString().slice(0,10)}.json`)));
-  $('#export-legacy').addEventListener('click',guard(()=>exportFile(store.state.legacyArchive,'travel-tiers-original.json')));
+  $('#export-legacy').addEventListener('click',guard(()=>exportFile({format:'travel-tiers-original-archive',local:store.state.legacyArchive||null,cloud:store.state.legacyCloudArchive||null},'travel-tiers-original.json')));
   $('#import-backup').addEventListener('change',guard(async event=>{
     const file=event.target.files[0];event.target.value='';if(!file)return;if(file.size>2*1024*1024)throw new Error('Choose a backup smaller than 2 MB.');
     importData=parseBackup(await file.text());const matches=importData.filter(c=>store.countries.some(existing=>normalizeName(existing.name)===normalizeName(c.name))).length;

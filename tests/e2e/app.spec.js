@@ -1,7 +1,7 @@
 import {test,expect} from '@playwright/test';
 
 async function add(page,name='Japan') {
-  await page.locator('#page-board [data-action="add"]').click();
+  await page.locator('#page-board [data-action="add"]').first().click();
   await page.locator('#destination-name').fill(name);
 }
 async function score(page,value) {for(const key of ['wonder','things','food','transportation','safety'])await page.locator(`#score-${key}`).selectOption(String(value));}
