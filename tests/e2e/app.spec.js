@@ -167,13 +167,11 @@ test('malformed backup is rejected without replacing the existing list', async (
   await add(page);
   await save(page);
   await page.getByRole('link', { name: 'Settings', exact: true }).click();
-  await page
-    .locator('#import-backup')
-    .setInputFiles({
-      name: 'bad.json',
-      mimeType: 'application/json',
-      buffer: Buffer.from('{"oops":true}'),
-    });
+  await page.locator('#import-backup').setInputFiles({
+    name: 'bad.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from('{"oops":true}'),
+  });
   await expect(page.locator('#toast')).toContainText('Travel Tiers JSON');
   await page.getByRole('link', { name: 'Tier board', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Edit Japan', exact: true })).toBeVisible();
@@ -215,4 +213,20 @@ test('phone layout has no horizontal overflow and interactive pills support keyb
   await expect(page.locator('#country-dialog')).toBeVisible();
   expect(errors).toEqual([]);
   await page.screenshot({ path: `test-results/editor-${test.info().project.name}.png` });
+});
+
+test('random discovery and tier-only presentation remain available', async ({ page }) => {
+  await page.addInitScript(() => {
+    Math.random = () => 0;
+  });
+  await page.goto('/');
+  await add(page);
+  await page.locator('#random-country').click();
+  await expect(page.locator('#destination-name')).toHaveValue('Afghanistan');
+  await save(page);
+  await page.locator('#toggle-tier-only').click();
+  await expect(page.locator('.app-header')).not.toBeVisible();
+  await expect(page.getByRole('button', { name: 'Edit Afghanistan', exact: true })).toBeVisible();
+  await page.locator('#exit-tier-only').click();
+  await expect(page.locator('.app-header')).toBeVisible();
 });

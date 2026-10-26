@@ -8,6 +8,7 @@ An Android app for Mike and Jen’s destination rankings, trip notes, photos, an
 - Independent Mike/Jen profiles and expected/experienced ratings. Edit both profiles before saving.
 - Average/Mike/Jen views, rating counts, disagreement sorting, status/tier filters, full-text search, and complete rating queues.
 - Countries and custom destinations such as Antarctica or Svalbard.
+- Random-country discovery, tier-only presentation view, and personal score reveals.
 - Structured budgets with currency, per-person/per-couple basis, and duration; legacy budgets remain visible.
 - Draft recovery, JSON export/import, and the last ten recovery points. Resets retain notes.
 - Pexels galleries with locks, cancellation, attribution, safe links, and no changes until Save.

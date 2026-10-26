@@ -15,6 +15,7 @@ import {
   clone,
   normalizeName,
   phaseTotal,
+  tierFor,
   rating,
   ratingPhase,
   rankingQueue,
@@ -166,6 +167,14 @@ function setPage() {
   if (page !== 'settings')
     $(`#${page === 'countries' ? 'countries-' : ''}filters-slot`).append($('#shared-filters'));
   if (page === 'settings') renderSettings();
+  if (page !== 'board') setTierOnly(false);
+}
+
+function setTierOnly(enabled) {
+  document.body.classList.toggle('tier-only', enabled);
+  $('#exit-tier-only').hidden = !enabled;
+  $('#toggle-tier-only').setAttribute('aria-pressed', String(enabled));
+  if (enabled) window.scrollTo(0, 0);
 }
 
 function budgetText(budget) {
@@ -422,6 +431,7 @@ function openEditor(id = null, profile = 'mike', draft = null) {
 function fillEditor() {
   const c = session.country;
   $('#dialog-title').textContent = session.isNew ? 'Add destination' : c.name;
+  $('#random-country').hidden = !session.isNew;
   $('#destination-name').value = c.name;
   $('#destination-status').value = c.status;
   $('#destination-season').value = c.bestTime;
@@ -559,7 +569,7 @@ function revealScore() {
   $('#score-preview').textContent =
     score === null
       ? 'Choose all five scores to reveal a total.'
-      : `${person(session.activeProfile)} · ${session.phase === 'expected' ? 'Expected' : 'Experienced'}: ${number(score)} / 25${session.country.profiles[session.activeProfile][session.phase].legacyTotal ? ' (imported total)' : ''}`;
+      : `${person(session.activeProfile)} · ${session.phase === 'expected' ? 'Expected' : 'Experienced'}: ${number(score)} / 25 · Tier ${tierFor(score)}${session.country.profiles[session.activeProfile][session.phase].legacyTotal ? ' (imported total)' : ''}`;
 }
 function renderGallery() {
   $('#photo-gallery').innerHTML = session.country.images
@@ -639,6 +649,23 @@ async function exportFile(data, filename) {
 }
 
 function bindEvents() {
+  $('#toggle-tier-only').addEventListener('click', () => setTierOnly(true));
+  $('#exit-tier-only').addEventListener('click', () => setTierOnly(false));
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && !document.querySelector('dialog[open]')) setTierOnly(false);
+  });
+  $('#random-country').addEventListener('click', () => {
+    const existing = new Set(store.countries.map((country) => normalizeName(country.name)));
+    const available = window.ALL_COUNTRIES.filter((name) => !existing.has(normalizeName(name)));
+    if (!available.length) {
+      toast('Every country is already on your list.');
+      return;
+    }
+    $('#destination-name').value = available[Math.floor(Math.random() * available.length)];
+    collectEditor();
+    scheduleDraft();
+    $('#destination-name').focus();
+  });
   window.addEventListener('hashchange', setPage);
   document.addEventListener(
     'click',
@@ -970,6 +997,7 @@ function bindEvents() {
       if ($('#confirm-dialog').open) $('#confirm-dialog').close('cancel');
       else if ($('#import-dialog').open) $('#import-dialog').close();
       else if (session) void closeEditor().catch((error) => toast(friendlyError(error)));
+      else if (document.body.classList.contains('tier-only')) setTierOnly(false);
       else if (page !== 'board') location.hash = 'board';
       else void App.minimizeApp();
     });

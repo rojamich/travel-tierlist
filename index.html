@@ -36,6 +36,7 @@
       You have an unfinished destination. <button id="resume-draft">Continue editing</button
       ><button id="discard-draft">Discard</button>
     </div>
+    <button id="exit-tier-only" class="tier-exit" hidden>Exit tier-only view</button>
     <main id="content" tabindex="-1">
       <section class="page" id="page-board" aria-labelledby="board-heading">
         <div class="page-title">
@@ -59,7 +60,10 @@
         <div id="filters-slot"></div>
         <div class="results-heading">
           <h2>Your tier board</h2>
-          <span id="result-count" class="subtle"></span>
+          <div class="button-row">
+            <span id="result-count" class="subtle"></span
+            ><button id="toggle-tier-only" aria-pressed="false">Tier-only view</button>
+          </div>
         </div>
         <div id="tier-board"></div>
       </section>
@@ -218,6 +222,7 @@
             >
           </div>
           <datalist id="country-options"></datalist>
+          <button id="random-country" type="button">Pick a random country</button>
           <p id="destination-hint" class="helper">
             Choose a country or add a custom destination, like Antarctica.
           </p>
