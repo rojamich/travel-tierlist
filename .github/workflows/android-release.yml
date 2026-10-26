@@ -1,0 +1,48 @@
+name: Signed Android APK
+on:
+  workflow_dispatch:
+    inputs:
+      version_code:
+        description: Increasing Android version code (greater than the installed version)
+        required: true
+        default: '20001'
+permissions:
+  contents: read
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: android-actions/setup-android@v3
+      - run: npm ci
+      - run: npm test
+      - run: npm run android:sync
+      - name: Build signed APK
+        env:
+          SIGNING_KEY_BASE64: ${{ secrets.TRAVEL_TIERS_KEYSTORE_BASE64 }}
+          TRAVEL_TIERS_STORE_PASSWORD: ${{ secrets.TRAVEL_TIERS_STORE_PASSWORD }}
+          TRAVEL_TIERS_KEY_PASSWORD: ${{ secrets.TRAVEL_TIERS_KEY_PASSWORD }}
+          TRAVEL_TIERS_VERSION_CODE: ${{ inputs.version_code }}
+          TRAVEL_TIERS_KEY_ALIAS: travel-tiers
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$SIGNING_KEY_BASE64" || { echo 'Add the Android signing secrets described in docs/ANDROID.md.'; exit 1; }
+          export TRAVEL_TIERS_KEYSTORE="$RUNNER_TEMP/travel-tiers.jks"
+          trap 'rm -f "$TRAVEL_TIERS_KEYSTORE"' EXIT
+          printf '%s' "$SIGNING_KEY_BASE64" | base64 --decode > "$TRAVEL_TIERS_KEYSTORE"
+          cd android
+          ./gradlew assembleRelease --no-daemon
+      - uses: actions/upload-artifact@v4
+        with:
+          name: travel-tiers-android-signed
+          path: android/app/build/outputs/apk/release/app-release.apk
+          retention-days: 90

@@ -1,0 +1,59 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function member() {
+      return request.auth != null && request.auth.token.email_verified == true
+        && exists(/databases/$(database)/documents/members/$(request.auth.uid));
+    }
+    function bounded(value, size) { return value is string && value.size() <= size; }
+    function score(value) { return value == null || (value is int && value >= 1 && value <= 5); }
+    function scores(value) {
+      return value == null || (value is map
+        && value.keys().hasAll(['wonder','things','food','transportation','safety'])
+        && value.keys().hasOnly(['wonder','things','food','transportation','safety'])
+        && score(value.wonder) && score(value.things) && score(value.food) && score(value.transportation) && score(value.safety));
+    }
+    function phase(value) { return value is map && value.keys().hasOnly(['scores','legacyTotal']) && scores(value.scores)
+      && (!('legacyTotal' in value) || value.legacyTotal == null || (value.legacyTotal is number && value.legacyTotal >= 5 && value.legacyTotal <= 25)); }
+    function stamp(data) { return bounded(data._rev,100) && data.updatedAt == request.time; }
+    function profile(data) {
+      return data.keys().hasAll(['expected','experienced','notes','preNotes','postNotes','_rev','updatedAt'])
+        && data.keys().hasOnly(['expected','experienced','notes','preNotes','postNotes','_rev','updatedAt'])
+        && phase(data.expected) && phase(data.experienced)
+        && bounded(data.notes,20000) && bounded(data.preNotes,20000) && bounded(data.postNotes,20000) && stamp(data);
+    }
+    function https(value) { return bounded(value,2048) && (value == '' || value.matches('https://.*')); }
+    function image(value) { return value is map && value.keys().hasOnly(['src','alt','photographer','url','locked'])
+      && https(value.src) && https(value.url) && bounded(value.alt,500) && bounded(value.photographer,200) && value.locked is bool; }
+    function images(value) { return value is list && value.size() <= 5
+      && (value.size()<1 || image(value[0])) && (value.size()<2 || image(value[1])) && (value.size()<3 || image(value[2]))
+      && (value.size()<4 || image(value[3])) && (value.size()<5 || image(value[4])); }
+    function budget(value) { return value is map && value.keys().hasOnly(['amount','currency','basis','days','legacy'])
+      && (value.amount == null || (value.amount is number && value.amount >= 0 && value.amount <= 1000000000))
+      && value.currency is string && value.currency.matches('[A-Z]{3}') && value.basis in ['person','couple']
+      && (value.days == null || (value.days is int && value.days >= 1 && value.days <= 3650)) && bounded(value.legacy,500); }
+    function destination(data) {
+      return data.keys().hasAll(['name','status','bestTime','days','budget','manualTier','flagUrl','images','attractions','custom','deleted','schemaVersion','_rev','updatedAt'])
+        && data.keys().hasOnly(['name','status','bestTime','days','budget','manualTier','flagUrl','images','attractions','custom','deleted','schemaVersion','_rev','updatedAt'])
+        && bounded(data.name,100) && data.name.size()>0 && data.status in ['visited','planning','not-visited']
+        && bounded(data.bestTime,500) && bounded(data.days,500) && budget(data.budget)
+        && (data.manualTier == null || data.manualTier in ['S','A','B','C','D'])
+        && https(data.flagUrl) && images(data.images) && data.attractions is list && data.attractions.size()<=30
+        && data.custom is bool && data.deleted is bool && data.schemaVersion == 3 && stamp(data);
+    }
+    match /members/{uid} { allow read, write: if false; }
+    match /countries/{id} {
+      allow read: if member();
+      allow create, update: if member() && destination(request.resource.data);
+      // Tombstones preserve deletion across devices and offline edits.
+      allow delete: if false;
+      match /profiles/{key} {
+        allow read: if member();
+        allow create, update: if member() && key in ['mike','jen'] && profile(request.resource.data)
+          && (!exists(/databases/$(database)/documents/countries/$(id))
+            || !get(/databases/$(database)/documents/countries/$(id)).data.get('deleted',false));
+        allow delete: if false;
+      }
+    }
+  }
+}
