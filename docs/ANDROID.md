@@ -32,7 +32,7 @@ Set these environment variables in your local build environment, without putting
 - `TRAVEL_TIERS_STORE_PASSWORD`: keystore password
 - `TRAVEL_TIERS_KEY_PASSWORD`: key password
 - `TRAVEL_TIERS_KEY_ALIAS`: `travel-tiers`
-- `TRAVEL_TIERS_VERSION_CODE`: a whole number higher than the installed version (initial release: `20000`)
+- `TRAVEL_TIERS_VERSION_CODE`: a whole number higher than the installed version (initial release: `20000`; version 2.1: `20100`)
 
 ```sh
 npm run android:sync
@@ -49,3 +49,5 @@ For repeatable GitHub builds, configure repository secrets `TRAVEL_TIERS_KEYSTOR
 The web bundle is copied inside the APK by `cap sync android`; the app does not load a remote website. Export uses native Filesystem and Share plugins; Preferences stores the durable list. The hardware back button closes dialogs, returns to the board, then minimizes the app. Native builds do not register a service worker. Firebase email/password authentication works through the bundled JavaScript SDK and does not require OAuth redirects or a `google-services.json` file.
 
 The root Vite build remains usable for GitHub Pages. `.github/workflows/pages.yml` builds and publishes only `dist/`, including the compiled JavaScript, styles, icons, manifest, and service worker. In repository Settings → Pages → Build and deployment, set **Source** to **GitHub Actions**. Publishing the repository root directly serves uncompiled source and breaks the website. `scripts/verify-pages-build.mjs` checks every local HTML asset against the `/travel-tierlist/` project URL before deployment.
+
+CI also includes the standard `apksigner.jar` beside the aligned unsigned release APK for offline signing with your own private keystore. Keep the keystore outside the repository.

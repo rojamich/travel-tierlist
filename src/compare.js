@@ -3,8 +3,10 @@ import { cleanMeta, cleanProfile, SCORE_FIELDS, SCORE_LABELS, STATUS_LABELS } fr
 // Revision IDs and server timestamps describe writes, not differences in user content.
 export function sameContent(left, right, kind) {
   if (!left || !right) return left === right;
-  const clean = kind === 'meta' ? cleanMeta : cleanProfile;
-  return JSON.stringify(clean(left)) === JSON.stringify(clean(right));
+  // Field projection also equates absent scores and explicit "Not scored" values.
+  return (
+    JSON.stringify(comparisonFields(left, kind)) === JSON.stringify(comparisonFields(right, kind))
+  );
 }
 
 export function comparisonFields(raw, kind) {

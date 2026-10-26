@@ -82,3 +82,12 @@ test('equal totals do not hide category differences or note differences', () => 
     ['Before · Wonder', 'Before · Food', 'After-trip notes'],
   );
 });
+
+test('empty score representations do not cause invisible profile conflicts', () => {
+  const a = destination().profiles.mike,
+    b = structuredClone(a);
+  a.expected = { scores: null };
+  b.expected = { scores: scores(null) };
+  assert.equal(sameContent(a, b, 'profile'), true);
+  assert.deepEqual(changedFields(a, b, 'profile'), []);
+});

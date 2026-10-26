@@ -343,7 +343,7 @@ test('async buttons show waiting, reject duplicate clicks, and restore on succes
   release();
   await expect(page.locator('#regenerate-photos')).toBeEnabled();
   await expect(page.locator('#regenerate-photos')).toHaveText('Find photos');
-  await expect(page.locator('#photo-status')).toContainText('saved photos');
+  await expect(page.locator('#photo-status')).toContainText('existing photos');
   await page.locator('#clear-profile-scores').click();
   await expect(page.locator('#toast')).toBeVisible();
   await expect(page.locator('#country-dialog #toast')).toContainText('draft');

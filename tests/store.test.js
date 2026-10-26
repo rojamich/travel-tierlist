@@ -377,3 +377,34 @@ test('equivalent remote acknowledgments rebase edits made while uploading', asyn
   );
   assert.equal(store.countries[0].bestTime, 'Next edit');
 });
+
+test('repeated sync requests wait for the same upload instead of reporting early completion', async () => {
+  const { store } = await setup();
+  await store.saveCountry(fixture());
+  let release;
+  let calls = 0;
+  const gate = new Promise((resolve) => {
+    release = resolve;
+  });
+  const queue = new SyncQueue(store, {
+    async commit() {
+      calls++;
+      await gate;
+      return { ok: true };
+    },
+  });
+  const first = queue.flush();
+  const second = queue.flush();
+  assert.equal(first, second);
+  let done = false;
+  void second.then(() => {
+    done = true;
+  });
+  await Promise.resolve();
+  assert.equal(done, false);
+  assert.equal(calls, 1);
+  release();
+  await second;
+  assert.equal(store.pending.length, 0);
+  assert.equal(calls, 3);
+});

@@ -435,8 +435,15 @@ export class SyncQueue {
   stop() {
     this.active = false;
   }
-  async flush() {
-    if (this.running || !this.active) return;
+  flush() {
+    if (!this.active) return Promise.resolve();
+    if (this.inFlight) return this.inFlight;
+    this.inFlight = this.drain().finally(() => {
+      this.inFlight = null;
+    });
+    return this.inFlight;
+  }
+  async drain() {
     this.running = true;
     try {
       while (this.active) {
@@ -454,6 +461,7 @@ export class SyncQueue {
           return;
         }
       }
+      if (!this.active) return;
       this.onStatus(
         this.store.conflicts.length ? 'conflict' : this.store.pending.length ? 'pending' : 'synced',
       );
