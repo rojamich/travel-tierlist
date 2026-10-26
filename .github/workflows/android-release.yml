@@ -5,7 +5,7 @@ on:
       version_code:
         description: Increasing Android version code (greater than the installed version)
         required: true
-        default: '20001'
+        default: '20101'
 permissions:
   contents: read
 jobs:

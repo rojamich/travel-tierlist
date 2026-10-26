@@ -8,7 +8,17 @@ export const SCORE_LABELS = {
   transportation: 'Transportation',
   safety: 'Safety',
 };
-export const STATUSES = ['visited', 'planning', 'not-visited'];
+export const STATUSES = ['idea', 'planned', 'visited', 'revisit'];
+export const STATUS_LABELS = {
+  idea: 'Idea',
+  planned: 'Planned',
+  visited: 'Visited',
+  revisit: 'Revisit',
+};
+export const normalizeStatus = (status) =>
+  status === 'planning' ? 'planned' : STATUSES.includes(status) ? status : 'idea';
+export const hasVisited = (country) =>
+  ['visited', 'revisit'].includes(normalizeStatus(country.status));
 export const TIERS = ['S', 'A', 'B', 'C', 'D', 'unranked'];
 export const SCHEMA_VERSION = 3;
 export const normalizeName = (value) =>
@@ -77,11 +87,7 @@ export function tierFor(score) {
 }
 
 export function ratingPhase(country, selected = 'auto') {
-  return PHASES.includes(selected)
-    ? selected
-    : country.status === 'visited'
-      ? 'experienced'
-      : 'expected';
+  return PHASES.includes(selected) ? selected : hasVisited(country) ? 'experienced' : 'expected';
 }
 
 export function rating(country, view = 'average', phase = 'auto') {
@@ -120,7 +126,7 @@ export function phaseTotal(phase) {
 
 export function cleanProfile(raw = {}, status = 'visited') {
   const result = emptyProfile();
-  const legacyPhase = status === 'visited' ? 'experienced' : 'expected';
+  const legacyPhase = hasVisited({ status }) ? 'experienced' : 'expected';
   for (const phase of PHASES) {
     const phaseData = raw[phase] || (phase === legacyPhase ? raw : {});
     const scores = normalizeScores(phaseData.scores);
@@ -141,7 +147,7 @@ export function cleanMeta(raw) {
   if (!raw || typeof raw !== 'object') throw new Error('Invalid destination.');
   const name = text(raw.name, 100);
   if (!name) throw new Error('Every destination needs a name.');
-  const status = STATUSES.includes(raw.status) ? raw.status : 'not-visited';
+  const status = normalizeStatus(raw.status);
   const images = Array.isArray(raw.images)
     ? raw.images
         .slice(0, 5)
@@ -253,9 +259,7 @@ export function rankingQueue(countries, phase = 'auto') {
   }
   for (const list of Object.values(queue))
     list.sort(
-      (a, b) =>
-        Number(b.status === 'visited') - Number(a.status === 'visited') ||
-        a.name.localeCompare(b.name),
+      (a, b) => Number(hasVisited(b)) - Number(hasVisited(a)) || a.name.localeCompare(b.name),
     );
   return queue;
 }
@@ -278,7 +282,7 @@ export function selectCountries(countries, filters) {
       ].join(' ');
       return (
         (!query || normalizeName(search).includes(query)) &&
-        (filters.status === 'all' || country.status === filters.status) &&
+        (filters.status === 'all' || normalizeStatus(country.status) === filters.status) &&
         (filters.tier === 'all' || r.tier === filters.tier)
       );
     })

@@ -25,7 +25,7 @@ Google can remain enabled in Firebase, but the current app uses email/password s
    npm run cloud:member -- person@example.com
    ```
 
-   Alternatively use Firebase console → Firestore to create `members/{AUTHENTICATION_USER_UID}` with a simple `granted: true` field. Only a project administrator can add members; clients cannot grant themselves access. The document’s existence grants access, so delete it to revoke access.
+   Alternatively use Firebase console → Firestore to create `members/{AUTHENTICATION_USER_UID}` with a simple `granted: true` field. Only a project administrator can add members; clients cannot grant themselves access. The document must have boolean `granted: true`. Delete it or set `granted: false` to revoke access.
 
 5. Authenticate the Firebase CLI as the owner, review `firestore.rules`, then deploy:
 
@@ -50,6 +50,12 @@ The output is a raw administrator archive including profile subcollections. It i
 
 ## Permissions
 
-All list access requires a verified Firebase account with a `members/{uid}` document. Rules reject anonymous users, nonmembers, malformed profiles, invalid score values, unexpected fields, non-HTTPS media, client timestamps, and hard deletes. Recovery points and drafts remain device-local. Photo API keys are device-local and excluded from app exports and Firestore writes.
+All list access requires a verified Firebase account with a `members/{uid}` document whose boolean `granted` field is `true`. Rules reject anonymous users, nonmembers, malformed profiles, invalid score values, unexpected fields, non-HTTPS media, client timestamps, and hard deletes. Recovery points and drafts remain device-local. Photo API keys are device-local and excluded from app exports and Firestore writes.
 
 No production configuration or database change is performed by CI, app installation, or the test suite. Do not leave old permissive rules in place: deploy the reviewed rules before relying on private sync.
+
+## Updating to 2.1
+
+Publish the updated `firestore.rules` before using the 2.1 app on either phone. The new rules allow Idea (`idea`), Planned (`planned`), Visited (`visited`), and Revisit (`revisit`), and continue accepting older status values during rollout. They also enforce the member document’s `granted: true` flag. Existing UID membership entries with that flag need no changes.
+
+Older Not visited and Planning entries become Idea and Planned in the interface and on their next metadata save. Ratings, photos, notes, and backup version 3 remain compatible. The updated app automatically reconciles saved sync conflicts whose user content is identical. A real conflict shows only the changed fields, including photo links, locks, category ratings, and manual tiers.

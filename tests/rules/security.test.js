@@ -93,3 +93,16 @@ test('legacy documents can be replaced with the validated v3 schema', async () =
   );
   await assertSucceeds(setDoc(doc(allowed(), 'countries', 'japan'), meta()));
 });
+
+test('all destination lifecycle states are allowed, and invalid states are denied', async () => {
+  for (const status of ['idea', 'planned', 'visited', 'revisit', 'planning', 'not-visited'])
+    await assertSucceeds(setDoc(doc(allowed(), 'countries', 'japan'), { ...meta(), status }));
+  await assertFails(setDoc(doc(allowed(), 'countries', 'japan'), { ...meta(), status: 'invalid' }));
+});
+test('revoked membership is denied even when a member document still exists', async () => {
+  await env.withSecurityRulesDisabled((context) =>
+    setDoc(doc(context.firestore(), 'members', 'allowed'), { granted: false }),
+  );
+  await assertFails(getDocs(collection(allowed(), 'countries')));
+  await assertFails(setDoc(doc(allowed(), 'countries', 'japan'), meta()));
+});

@@ -20,6 +20,7 @@ import {
 } from 'firebase/firestore';
 import { PROFILE_KEYS, cleanMeta, cleanProfile, clone } from './model.js';
 import { SyncQueue } from './store.js';
+import { sameContent } from './compare.js';
 
 // Firebase web configuration identifies the project; access is enforced by firestore.rules.
 const app = initializeApp({
@@ -190,6 +191,8 @@ export class CloudSync {
             if (parentSnapshot.data()?.deleted)
               return { conflict: true, remote, reason: 'deleted-country' };
           }
+          if (remote && sameContent(operation.data, remote.data, operation.kind))
+            return { ok: true, revision: remote.revision };
           if ((remote?.revision || null) !== operation.baseRevision)
             return { conflict: true, remote, reason: 'changed' };
           transaction.set(reference, {
