@@ -25,8 +25,8 @@ test('all Not scored values clear the old rating',async({page})=>{
 });
 test('neither-rated destinations are available in both rank-next queues',async({page})=>{
   await page.goto('/');await add(page,'Antarctica');await save(page);
-  await expect(page.locator('[data-profile-key="mike"]')).toContainText('1 still to rate');await expect(page.locator('[data-profile-key="jen"]')).toContainText('1 still to rate');
-  await page.locator('[data-profile-key="jen"]').click();await expect(page.locator('[data-profile="jen"]')).toHaveAttribute('aria-pressed','true');
+  await expect(page.locator('#queue-actions [data-profile-key="mike"]')).toContainText('1 still to rate');await expect(page.locator('#queue-actions [data-profile-key="jen"]')).toContainText('1 still to rate');
+  await page.locator('#queue-actions [data-profile-key="jen"]').click();await expect(page.locator('[data-profile="jen"]')).toHaveAttribute('aria-pressed','true');
 });
 test('unsaved edits are recoverable after closing and reopening the app',async({page})=>{
   await page.goto('/');await add(page,'Svalbard');await page.locator('#profile-notes').fill('Remember the fjords');await page.locator('#close-editor').click();

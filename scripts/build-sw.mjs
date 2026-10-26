@@ -15,8 +15,11 @@ self.addEventListener('fetch',event=>{
   const url=new URL(event.request.url);
   if(event.request.method!=='GET'||url.origin!==self.location.origin)return;
   event.respondWith((async()=>{
-    const cached=await caches.match(event.request);if(cached)return cached;
-    try{return await fetch(event.request);}catch(error){if(event.request.mode==='navigate')return caches.match(new URL('./index.html',self.registration.scope));throw error;}
+    const cache=await caches.open(CACHE);
+    // Static assets are identical across Origin headers. Vite/Pages may emit Vary: Origin.
+    const key=event.request.mode==='navigate'?new URL('./index.html',self.registration.scope):event.request;
+    const cached=await cache.match(key,{ignoreVary:true});if(cached)return cached;
+    return fetch(event.request);
   })());
 });
 `);

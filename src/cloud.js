@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendEmailVerification, sendPasswordResetEmail, signOut } from 'firebase/auth';
+import { initializeAuth, indexedDBLocalPersistence, browserLocalPersistence, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendEmailVerification, sendPasswordResetEmail, signOut } from 'firebase/auth';
 import { getFirestore, collection, doc, onSnapshot, runTransaction, serverTimestamp } from 'firebase/firestore';
 import { PROFILE_KEYS, cleanMeta, cleanProfile, clone } from './model.js';
 import { SyncQueue } from './store.js';
@@ -11,7 +11,8 @@ const app = initializeApp({
   storageBucket: 'travel-tiers.firebasestorage.app', messagingSenderId: '158515437740',
   appId: '1:158515437740:web:213b3554ba8ad3022f7f09'
 });
-const auth = getAuth(app);
+// Email/password needs no popup resolver or remote Google iframe; startup works offline.
+const auth = initializeAuth(app,{persistence:[indexedDBLocalPersistence,browserLocalPersistence]});
 const db = getFirestore(app);
 
 function remoteEntity(snapshot, kind) {

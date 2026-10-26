@@ -109,7 +109,7 @@ export function cleanMeta(raw) {
 export function migrateCountry(raw) {
   const meta = cleanMeta(raw);
   const profiles = Object.fromEntries(PROFILE_KEYS.map(key => [key, cleanProfile(raw.profiles?.[key] ?? (key === 'mike' ? raw : {}), meta.status)]));
-  const hasScores = PROFILE_KEYS.some(key => PHASES.some(phase => Number.isFinite(total(profiles[key][phase].scores))));
+  const hasScores = PROFILE_KEYS.some(key => PHASES.some(phase => Number.isFinite(phaseTotal(profiles[key][phase]))));
   if (!hasScores && !('manualTier' in raw) && TIERS.includes(raw.tier) && raw.tier !== 'unranked') meta.manualTier = raw.tier;
   const id = typeof raw.id === 'string' && /^[\p{L}\p{N}_()'’-][\p{L}\p{N}_()'’ .-]{0,149}$/u.test(raw.id) ? raw.id : `destination-${uid()}`;
   return { id, ...meta, profiles };
